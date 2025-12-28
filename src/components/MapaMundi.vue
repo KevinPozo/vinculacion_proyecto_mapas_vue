@@ -38,10 +38,8 @@ export default {
   },
 
   beforeDestroy() {
-    if (this.chart) {
-      if (!this.chart.isDisposed()) {
-        this.chart.dispose();
-      }
+    if (this.chart && !this.chart.isDisposed()) {
+      this.chart.dispose();
     }
   },
 
@@ -77,20 +75,11 @@ export default {
       polygonTemplate.stroke = am4core.color(this.configuracion.colorBorde);
       polygonTemplate.strokeWidth = 0.5;
 
-      polygonTemplate.states.create("hover");
+      polygonTemplate.propertyFields.fill = "colorHover";
 
-      polygonTemplate.events.on("over", (ev) => {
-        let ctx = ev.target.dataItem.dataContext;
-        if (ctx && ctx.colorHover) {
-          ev.target.fill = am4core.color(ctx.colorHover);
-        } else {
-          ev.target.fill = am4core.color("#CCC6C6");
-        }
-      });
-
-      polygonTemplate.events.on("out", (ev) => {
-        ev.target.fill = am4core.color(this.configuracion.colorDefecto);
-      });
+      let hs = polygonTemplate.states.create("hover");
+      hs.properties.stroke = am4core.color("#000000");
+      hs.properties.strokeWidth = 1;
 
       polygonSeries.data = this.datos;
       this.polygonSeries = polygonSeries;
@@ -105,12 +94,12 @@ export default {
         chart.exporting.menu = new am4core.ExportMenu();
         chart.exporting.menu.align = "right";
         chart.exporting.menu.verticalAlign = "top";
-
         chart.exporting.menu.items = [{
-          label: "...",
+          label: "",
+          icon: "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23546E7A' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/%3E%3C/svg%3E",
           menu: [
             {
-              label: "Image",
+              label: "Imagen",
               menu: [
                 { type: "png", label: "PNG" },
                 { type: "jpg", label: "JPG" },
@@ -119,7 +108,7 @@ export default {
               ]
             },
             {
-              label: "Data",
+              label: "Datos",
               menu: [
                 { type: "json", label: "JSON" },
                 { type: "csv", label: "CSV" },
@@ -128,15 +117,13 @@ export default {
               ]
             },
             {
-              label: "Print",
+              label: "Imprimir",
               type: "print"
             }
           ]
         }];
-
         chart.exporting.filePrefix = "mapa_export";
       }
-
       this.chart = chart;
     },
   },
