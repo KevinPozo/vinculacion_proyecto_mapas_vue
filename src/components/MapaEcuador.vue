@@ -147,8 +147,10 @@ export default {
 
       if (tieneProvincias) {
         console.log("📍 Cargando geodata de provincias...");
-        chart.geodata = this.geoJsonProvincias;
-        this.cantidadFeatures = this.geoJsonProvincias.features.length;
+        // CORRECCIÓN: Invertir winding order para evitar "cuadro rosa"
+        const provinciasCorregidas = this.corregirGeoJSON(this.geoJsonProvincias);
+        chart.geodata = provinciasCorregidas;
+        this.cantidadFeatures = provinciasCorregidas.features.length;
       } else {
         console.error("❌ No hay datos de provincias válidos");
         chart.geodata = { type: "FeatureCollection", features: [] };
@@ -295,8 +297,11 @@ export default {
       console.log(`🗺️ Actualizando mapa a nivel: ${nuevoNivel}`);
       console.log(`📊 Cargando ${nuevosFeatures.length} features`);
 
+      // CORRECCIÓN: Invertir winding order también en drill-down
+      const geojsonCorregido = this.corregirGeoJSON(nuevoGeoJSON);
+
       // Actualizar geodata directamente
-      this.chart.geodata = nuevoGeoJSON;
+      this.chart.geodata = geojsonCorregido;
       this.nivelActual = nuevoNivel;
       this.tituloActual = nuevoTitulo;
 
@@ -324,6 +329,41 @@ export default {
           this.chart.goHome();
         }, 100);
       }
+    },
+
+    /**
+     * Corrige el winding order de los polígonos GeoJSON.
+     * amCharts 4 espera que el anillo exterior sea counter-clockwise.
+     * Muchos GIS exportan en clockwise. Esto causa que el polígono
+     * se renderice como "todo el mundo menos el polígono".
+     */
+    corregirGeoJSON(geojsonOriginal) {
+      // Crear copia profunda para no mutar prop original
+      const geojson = JSON.parse(JSON.stringify(geojsonOriginal));
+
+      if (!geojson.features) return geojson;
+
+      geojson.features.forEach(feature => {
+        const geometry = feature.geometry;
+        if (!geometry) return;
+
+        if (geometry.type === "Polygon") {
+          // geometry.coordinates es Array<Array<[lon, lat]>>
+          // Anillo 0 es exterior, otros son agujeros
+          geometry.coordinates.forEach(ring => {
+            ring.reverse();
+          });
+        } else if (geometry.type === "MultiPolygon") {
+          // geometry.coordinates es Array<Array<Array<[lon, lat]>>>
+          geometry.coordinates.forEach(polygon => {
+            polygon.forEach(ring => {
+              ring.reverse();
+            });
+          });
+        }
+      });
+
+      return geojson;
     },
   },
 };
