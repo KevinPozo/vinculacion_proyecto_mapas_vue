@@ -8,7 +8,7 @@
 
 <script>
 import MapaExtranjero from "@/components/MapaExtranjero.vue";
-import MapaEcuador from "@/components/MapaEcuadorView.vue";
+import MapaEcuador from "@/views/MapaEcuadorView.vue";
 
 export default {
   name: "PaginaResultadosExtranjero",

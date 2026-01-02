@@ -4,369 +4,361 @@
       <div
         v-if="nivelActual !== 'provincias'"
         class="boton-regresar"
-        @click="subirNivel"
+        @click="handleGoBack"
       >
-        <v-icon left small>mdi-arrow-left</v-icon>
+        <!-- Se asume uso de MDI icons o texto simple si no hay vuetify disponible en este scope -->
+        <span class="icono-atras">←</span>
         Regresar a {{ nombreNivelSuperior }}
       </div>
     </transition>
 
     <div class="titulo-area">{{ tituloActual }}</div>
 
-    <!-- Panel de Debug -->
-    <div v-if="mostrarDebug" class="panel-debug">
-      <div class="debug-item">
-        <strong>Nivel:</strong> {{ nivelActual }}
-      </div>
-      <div class="debug-item">
-        <strong>Features:</strong> {{ cantidadFeatures }}
-      </div>
-      <div class="debug-item">
-        <strong>Último click:</strong> {{ ultimoClick }}
-      </div>
-      <div class="debug-item">
-        <strong>Geometrías válidas:</strong> {{ geometriasValidas }}
-      </div>
-    </div>
+    <!-- Panel de Debug (Opcional según prop) -->
+    <!-- <div v-if="debug" class="panel-debug">
+      <div class="debug-item"><strong>Nivel:</strong> {{ nivelActual }}</div>
+      <div class="debug-item"><strong>Features:</strong> {{ cantidadFeatures }}</div>
+    </div> -->
 
-    <div class="contenedor-mapa" ref="chartdiv"></div>
+    <div class="contenedor-mapa" ref="chartDiv"></div>
   </div>
 </template>
 
-<script>
-import * as am4core from "@amcharts/amcharts4/core";
-import * as am4maps from "@amcharts/amcharts4/maps";
-import am4themes_animated from "@amcharts/amcharts4/themes/animated";
+<script setup>
+/**
+ * @file MapaElectoral.vue
+ * @description Componente principal de visualización de mapas con funcionalidad drill-down (Provincias -> Cantones -> Parroquias).
+ * Implementado con AmCharts 4.
+ */
 
-am4core.useTheme(am4themes_animated);
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import * as am4core from "@amcharts/amcharts4/core"
+import * as am4maps from "@amcharts/amcharts4/maps"
+import am4themes_animated from "@amcharts/amcharts4/themes/animated"
 
-export default {
-  name: "MapaEcuadorDrilldown",
+am4core.useTheme(am4themes_animated)
 
-  props: {
-    geoJsonProvincias: { type: Object, required: true },
-    geoJsonCantones: { type: Object, required: true },
-    geoJsonParroquias: { type: Object, required: true },
-    configuracion: {
-      type: Object,
-      default: () => ({
-        colorBase: "#ECEFF1",
-        colorHover: "#E91E63",
-        colorBorde: "#607D8B",
-      }),
-    },
-    debug: {
-      type: Boolean,
-      default: false
+// --- 1. PROPS ---
+
+const props = defineProps({
+  /** Objeto GeoJSON de Provincias */
+  geoJsonProvincias: {
+    type: Object,
+    required: true
+  },
+  /** Objeto GeoJSON de Cantones */
+  geoJsonCantones: {
+    type: Object,
+    required: true
+  },
+  /** Objeto GeoJSON de Parroquias */
+  geoJsonParroquias: {
+    type: Object,
+    required: true
+  },
+  /** Configuración de colores y estilos */
+  configuracion: {
+    type: Object,
+    default: () => ({
+      colorBase: "#ECEFF1",
+      colorHover: "#E91E63",
+      colorBorde: "#607D8B",
+    })
+  },
+  /** Activar modo debug */
+  debug: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// --- 2. EMITS ---
+
+/**
+ * Eventos emitidos por el componente
+ * @event region-selected - Se emite al seleccionar una región
+ * @event level-change - Se emite al cambiar de nivel (drill-down/up)
+ */
+const emit = defineEmits(['region-selected', 'level-change'])
+
+// --- 3. VARIABLES REACTIVAS ---
+
+const chartDiv = ref(null)
+const nivelActual = ref("provincias")
+const tituloActual = ref("Ecuador")
+const cantidadFeatures = ref(0)
+const historialNavegacion = ref([])
+
+// Variables internas de AmCharts (no reactivas para performance)
+let chart = null
+let polygonSeries = null
+
+// --- 4. COMPUTED PROPERTIES ---
+
+const nombreNivelSuperior = computed(() => {
+  return nivelActual.value === "parroquias" ? "Cantón" : "Ecuador"
+})
+
+// --- 5. FUNCIONES ESTÁNDAR (SEVEE) ---
+
+/**
+ * Recupera datos electorales asociados a una geometría.
+ * @function getElectionData
+ * @param {Object} properties - Propiedades del feature GeoJSON.
+ * @returns {Object|null} Datos electorales o null.
+ */
+const getElectionData = (properties) => {
+  // TODO: Implementar lógica de cruce con JSON de datos electorales
+  // Por ahora retorna properties para visualización básica
+  return properties
+}
+
+/**
+ * Define el estilo de la región (usado en adaptadores de AmCharts).
+ * @function getRegionStyle
+ * @param {Object} dataContext - Datos del polígono.
+ * @returns {String} Color hexadecimal.
+ */
+const getRegionStyle = (dataContext) => {
+  // Lógica estándar: Si no hay ganador definido, usar color base
+  if (!dataContext.ganador) {
+    return props.configuracion.colorBase
+  }
+  // TODO: Retornar color del partido ganador
+  return props.configuracion.colorBase
+}
+
+/**
+ * Configura el tooltip de la región.
+ * @function bindRegionTooltip
+ * @param {Object} template - Template del polígono de AmCharts.
+ */
+const bindRegionTooltip = (template) => {
+  // Estándar: Nombre zona + Info básica
+  // AmCharts usa sintaxis de corchetes para templates de datos
+  template.tooltipText = `[bold]{PROVINCIA}[/]
+{CANTON}
+{PARROQUIA}
+[font-size: 12px]Click para detalles[/]`
+}
+
+/**
+ * Ajusta la cámara del mapa.
+ * @function handleMapReady
+ */
+const handleMapReady = () => {
+  if (chart) {
+    chart.goHome()
+    console.log("✓ Mapa renderizado y ajustado")
+  }
+}
+
+/**
+ * Gestiona la navegación descendente (Drill-down).
+ * @function handleRegionClick
+ * @param {Object} feature - Objeto GeoJSON/Data del polígono.
+ */
+const handleRegionClick = (event) => {
+  // AmCharts pasa un objeto de evento; el dataContext suele estar en
+  // event.target.dataItem.dataContext. Protegemos accesos y añadimos
+  // comprobaciones para evitar errores cuando no exista dataContext.
+  const target = event?.target || event?.mapPolygon || event
+  const data = target?.dataItem?.dataContext || target?.dataContext || event?.dataItem?.dataContext
+
+  if (!data) {
+    console.warn('handleRegionClick: dataContext no disponible en el evento', event)
+    return
+  }
+
+  console.log(`Click en: ${data.PROVINCIA || data.CANTON || data.name}`, data)
+  emit('region-selected', data)
+
+  if (nivelActual.value === "provincias") {
+    const codProvincia = data.CODPRO || data.properties?.CODPRO
+    const nombre = data.PROVINCIA || data.properties?.PROVINCIA || data.name
+    if (codProvincia) {
+      entrarEnProvincia(codProvincia, nombre)
     }
-  },
-
-  data() {
-    return {
-      chart: null,
-      polygonSeries: null,
-      nivelActual: "provincias",
-      historialNavegacion: [],
-      tituloActual: "Ecuador",
-      mostrarDebug: this.debug,
-      cantidadFeatures: 0,
-      ultimoClick: "Ninguno",
-      geometriasValidas: 0
-    };
-  },
-
-  computed: {
-    nombreNivelSuperior() {
-      return this.nivelActual === "parroquias" ? "Cantón" : "Ecuador";
-    },
-  },
-
-  mounted() {
-    this.validarDatos();
-    this.crearMapa();
-  },
-
-  beforeDestroy() {
-    if (this.chart) {
-      this.chart.dispose();
+  } else if (nivelActual.value === "cantones") {
+    const codCanton = data.CODCAN || data.properties?.CODCAN
+    const nombre = data.CANTON || data.properties?.CANTON || data.name
+    if (codCanton) {
+      entrarEnCanton(codCanton, nombre)
     }
-  },
+  }
+}
 
-  methods: {
-    validarDatos() {
-      console.log("=== VALIDACIÓN DE DATOS ===");
-      
-      // Validar provincias
-      if (this.geoJsonProvincias?.features) {
-        console.log(`✓ Provincias: ${this.geoJsonProvincias.features.length} features`);
-        const primeraProvi = this.geoJsonProvincias.features[0];
-        console.log("Primera provincia:", primeraProvi.properties);
-        console.log("Tipo de geometría:", primeraProvi.geometry?.type);
-        console.log("Coordenadas (muestra):", JSON.stringify(primeraProvi.geometry?.coordinates?.[0]?.[0]?.slice(0, 2)));
-      }
+/**
+ * Gestiona la navegación ascendente (Drill-up).
+ * @function handleGoBack
+ */
+const handleGoBack = () => {
+  if (historialNavegacion.value.length > 0) {
+    const estadoAnterior = historialNavegacion.value.pop()
+    
+    // Restaurar datos en el gráfico
+    chart.geodata = estadoAnterior.geodata
+    
+    // Restaurar estado reactivo
+    nivelActual.value = estadoAnterior.nivel
+    tituloActual.value = estadoAnterior.titulo
+    cantidadFeatures.value = estadoAnterior.geodata.features.length
 
-      // Validar cantones
-      if (this.geoJsonCantones?.features) {
-        console.log(`✓ Cantones: ${this.geoJsonCantones.features.length} features`);
-        const codigosProvinciaEnCantones = new Set(
-          this.geoJsonCantones.features.map(f => f.properties.CODPRO)
-        );
-        console.log("Códigos de provincia en cantones:", Array.from(codigosProvinciaEnCantones));
-      }
+    emit('level-change', { nivel: nivelActual.value })
+    
+    // Re-zoom
+    setTimeout(() => {
+      chart.goHome()
+    }, 100)
+  }
+}
 
-      // Validar parroquias
-      if (this.geoJsonParroquias?.features) {
-        console.log(`✓ Parroquias: ${this.geoJsonParroquias.features.length} features`);
-      }
+// --- 6. MÉTODOS AUXILIARES ---
 
-      console.log("=========================");
-    },
+/**
+ * Filtra y carga cantones de una provincia.
+ * @param {String} idProvincia Código de provincia.
+ * @param {String} nombreProvincia Nombre para el título.
+ */
+const entrarEnProvincia = (idProvincia, nombreProvincia) => {
+  const features = props.geoJsonCantones.features.filter(f => f.properties.CODPRO === idProvincia)
+  
+  if (features.length > 0) {
+    actualizarMapa(features, "cantones", `Provincia de ${nombreProvincia}`)
+  } else {
+    console.warn(`No hay cantones para la provincia ${idProvincia}`)
+  }
+}
 
-    crearMapa() {
-      // Crear el chart
-      let chart = am4core.create(this.$refs.chartdiv, am4maps.MapChart);
-      
-      // CRÍTICO: Usar proyección correcta para coordenadas lat/long
-      chart.projection = new am4maps.projections.Miller();
-      
-      // Desactivar zoom con rueda del mouse
-      chart.chartContainer.wheelable = false;
-      
-      // Configuración de la serie de polígonos
-      let polygonSeries = chart.series.push(new am4maps.MapPolygonSeries());
-      polygonSeries.useGeodata = true;
-      
-      // IMPORTANTE: No usar exclude, esto puede causar problemas
-      polygonSeries.exclude = [];
+/**
+ * Filtra y carga parroquias de un cantón.
+ * @param {String} idCanton Código de cantón.
+ * @param {String} nombreCanton Nombre para el título.
+ */
+const entrarEnCanton = (idCanton, nombreCanton) => {
+  const features = props.geoJsonParroquias.features.filter(f => f.properties.CODCAN === idCanton)
+  
+  if (features.length > 0) {
+    actualizarMapa(features, "parroquias", `Cantón ${nombreCanton}`)
+  } else {
+    console.warn(`No hay parroquias para el cantón ${idCanton}`)
+  }
+}
 
-      // Validar y cargar datos de provincias
-      const tieneProvincias =
-        this.geoJsonProvincias &&
-        Array.isArray(this.geoJsonProvincias.features) &&
-        this.geoJsonProvincias.features.length > 0;
+/**
+ * Actualiza la data del mapa y guarda historial.
+ * @param {Array} nuevosFeatures Lista de features a renderizar.
+ * @param {String} nuevoNivel Nombre del nuevo nivel.
+ * @param {String} nuevoTitulo Título a mostrar.
+ */
+const actualizarMapa = (nuevosFeatures, nuevoNivel, nuevoTitulo) => {
+  // Guardar estado actual
+  historialNavegacion.value.push({
+    nivel: nivelActual.value,
+    geodata: chart.geodata,
+    titulo: tituloActual.value
+  })
 
-      if (tieneProvincias) {
-        console.log("📍 Cargando geodata de provincias...");
-        // CORRECCIÓN: Invertir winding order para evitar "cuadro rosa"
-        const provinciasCorregidas = this.corregirGeoJSON(this.geoJsonProvincias);
-        chart.geodata = provinciasCorregidas;
-        this.cantidadFeatures = provinciasCorregidas.features.length;
-      } else {
-        console.error("❌ No hay datos de provincias válidos");
-        chart.geodata = { type: "FeatureCollection", features: [] };
-      }
+  // Preparar nuevo GeoJSON
+  const nuevoGeoJSON = {
+    type: "FeatureCollection",
+    features: nuevosFeatures
+  }
+  
+  // Corregir winding order (necesario para AmCharts)
+  const geoJsonCorregido = corregirGeoJSON(nuevoGeoJSON)
 
-      // Template de polígonos
-      let polygonTemplate = polygonSeries.mapPolygons.template;
+  // Aplicar cambios
+  chart.geodata = geoJsonCorregido
+  nivelActual.value = nuevoNivel
+  tituloActual.value = nuevoTitulo
+  cantidadFeatures.value = nuevosFeatures.length
 
-      // Tooltip que muestra todos los campos disponibles
-      polygonTemplate.tooltipText = "[bold]{PROVINCIA}[/]\n{CANTON}\n{PARROQUIA}";
-      
-      // ESTILOS CRÍTICOS - Asegurar visibilidad
-      polygonTemplate.fill = am4core.color(this.configuracion.colorBase);
-      polygonTemplate.fillOpacity = 1; // DEBE SER 1
-      polygonTemplate.stroke = am4core.color(this.configuracion.colorBorde);
-      polygonTemplate.strokeOpacity = 1;
-      polygonTemplate.strokeWidth = 1;
-      
-      // NO USAR nonScalingStroke en mapas (causa problemas de rendering)
-      polygonTemplate.nonScalingStroke = false;
+  emit('level-change', { nivel: nuevoNivel })
 
-      // Estado hover
-      let hs = polygonTemplate.states.create("hover");
-      hs.properties.fill = am4core.color(this.configuracion.colorHover);
-      hs.properties.fillOpacity = 0.8;
+  setTimeout(() => {
+    chart.goHome()
+  }, 100)
+}
 
-      // Estado activo
-      let as = polygonTemplate.states.create("active");
-      as.properties.fill = am4core.color(this.configuracion.colorHover).brighten(-0.3);
+/**
+ * Corrige el winding order de los polígonos (AmCharts requiere Counter-Clockwise para anillos exteriores).
+ * @param {Object} geojsonOriginal 
+ */
+const corregirGeoJSON = (geojsonOriginal) => {
+  const geojson = JSON.parse(JSON.stringify(geojsonOriginal))
+  if (!geojson.features) return geojson
 
-      // Evento de click
-      polygonTemplate.events.on("hit", this.manejarClickRegion);
+  geojson.features.forEach(feature => {
+    const geometry = feature.geometry
+    if (!geometry) return
+    if (geometry.type === "Polygon") {
+      geometry.coordinates.forEach(ring => ring.reverse())
+    } else if (geometry.type === "MultiPolygon") {
+      geometry.coordinates.forEach(poly => poly.forEach(ring => ring.reverse()))
+    }
+  })
+  return geojson
+}
 
-      this.polygonSeries = polygonSeries;
-      this.chart = chart;
+/**
+ * Inicializa el mapa de AmCharts.
+ */
+const crearMapa = () => {
+  chart = am4core.create(chartDiv.value, am4maps.MapChart)
+  chart.projection = new am4maps.projections.Miller()
+  chart.chartContainer.wheelable = false
 
-      // Evento cuando el mapa está listo
-      chart.events.on("ready", () => {
-        console.log("✓ Mapa renderizado");
-        
-        // Contar geometrías válidas
-        this.geometriasValidas = this.polygonSeries.mapPolygons.length;
-        console.log(`✓ Polígonos dibujados: ${this.geometriasValidas}`);
-        
-        // Ajustar vista
-        chart.homeZoomLevel = 1;
-        chart.goHome();
-        
-        // Log de bounds
-        console.log("Bounds del mapa:", {
-          north: this.polygonSeries.north,
-          south: this.polygonSeries.south,
-          east: this.polygonSeries.east,
-          west: this.polygonSeries.west
-        });
-      });
+  polygonSeries = chart.series.push(new am4maps.MapPolygonSeries())
+  polygonSeries.useGeodata = true
+  polygonSeries.exclude = []
 
-      // Agregar controles de zoom
-      chart.zoomControl = new am4maps.ZoomControl();
-      chart.zoomControl.align = "right";
-      chart.zoomControl.valign = "bottom";
-    },
+  // Cargar datos iniciales
+  if (props.geoJsonProvincias && props.geoJsonProvincias.features) {
+    const datosCorregidos = corregirGeoJSON(props.geoJsonProvincias)
+    chart.geodata = datosCorregidos
+    cantidadFeatures.value = datosCorregidos.features.length
+  }
 
-    manejarClickRegion(ev) {
-      const data = ev.target.dataItem.dataContext;
-      
-      console.log("=== CLICK EN REGIÓN ===");
-      console.log("Nivel actual:", this.nivelActual);
-      console.log("Propiedades:", data);
+  // Configurar Template
+  const polygonTemplate = polygonSeries.mapPolygons.template
+  bindRegionTooltip(polygonTemplate)
+  
+  // Estilos base
+  polygonTemplate.fill = am4core.color(props.configuracion.colorBase)
+  polygonTemplate.stroke = am4core.color(props.configuracion.colorBorde)
+  polygonTemplate.strokeWidth = 1
+  polygonTemplate.nonScalingStroke = false
 
-      if (this.nivelActual === "provincias") {
-        const codProvincia = data.CODPRO;
-        const nombreProvincia = data.PROVINCIA || "Provincia";
-        
-        this.ultimoClick = `${nombreProvincia} (${codProvincia})`;
-        
-        if (codProvincia) {
-          console.log(`✓ Navegando a cantones de provincia: ${nombreProvincia} (${codProvincia})`);
-          this.entrarEnProvincia(codProvincia, nombreProvincia);
-        }
-      } else if (this.nivelActual === "cantones") {
-        const codCanton = data.CODCAN;
-        const nombreCanton = data.CANTON || "Cantón";
-        
-        this.ultimoClick = `${nombreCanton} (${codCanton})`;
-        
-        if (codCanton) {
-          console.log(`✓ Navegando a parroquias de cantón: ${nombreCanton} (${codCanton})`);
-          this.entrarEnCanton(codCanton, nombreCanton);
-        }
-      }
-    },
+  // Estados
+  const hs = polygonTemplate.states.create("hover")
+  hs.properties.fill = am4core.color(props.configuracion.colorHover)
 
-    entrarEnProvincia(idProvincia, nombreProvincia) {
-      console.log(`Buscando cantones con CODPRO = "${idProvincia}"`);
-      
-      const featuresFiltrados = this.geoJsonCantones.features.filter(f => {
-        return f.properties.CODPRO === idProvincia;
-      });
+  const as = polygonTemplate.states.create("active")
+  as.properties.fill = am4core.color(props.configuracion.colorHover).brighten(-0.3)
 
-      console.log(`Encontrados ${featuresFiltrados.length} cantones`);
+  // Eventos
+  polygonTemplate.events.on("hit", handleRegionClick)
+  chart.events.on("ready", handleMapReady)
 
-      if (featuresFiltrados.length === 0) {
-        alert(`No se encontraron cantones para ${nombreProvincia}`);
-        return;
-      }
+  // Controles
+  const zoomControl = new am4maps.ZoomControl()
+  zoomControl.align = "right"
+  zoomControl.valign = "bottom"
+  chart.zoomControl = zoomControl
+}
 
-      this.actualizarMapa(featuresFiltrados, "cantones", nombreProvincia);
-    },
+// --- 7. LIFECYCLE HOOKS ---
 
-    entrarEnCanton(idCanton, nombreCanton) {
-      console.log(`Buscando parroquias con CODCAN = "${idCanton}"`);
-      
-      const featuresFiltrados = this.geoJsonParroquias.features.filter(f => {
-        return f.properties.CODCAN === idCanton;
-      });
+onMounted(() => {
+  crearMapa()
+})
 
-      console.log(`Encontradas ${featuresFiltrados.length} parroquias`);
-
-      if (featuresFiltrados.length === 0) {
-        alert(`No se encontraron parroquias para ${nombreCanton}`);
-        return;
-      }
-
-      this.actualizarMapa(featuresFiltrados, "parroquias", nombreCanton);
-    },
-
-    actualizarMapa(nuevosFeatures, nuevoNivel, nuevoTitulo) {
-      // Guardar estado actual en historial
-      this.historialNavegacion.push({
-        nivel: this.nivelActual,
-        geodata: this.chart.geodata,
-        titulo: this.tituloActual,
-      });
-
-      // Crear nuevo GeoJSON
-      const nuevoGeoJSON = {
-        type: "FeatureCollection",
-        features: nuevosFeatures,
-      };
-
-      this.cantidadFeatures = nuevosFeatures.length;
-
-      console.log(`🗺️ Actualizando mapa a nivel: ${nuevoNivel}`);
-      console.log(`📊 Cargando ${nuevosFeatures.length} features`);
-
-      // CORRECCIÓN: Invertir winding order también en drill-down
-      const geojsonCorregido = this.corregirGeoJSON(nuevoGeoJSON);
-
-      // Actualizar geodata directamente
-      this.chart.geodata = geojsonCorregido;
-      this.nivelActual = nuevoNivel;
-      this.tituloActual = nuevoTitulo;
-
-      // Esperar a que se renderice y hacer zoom
-      setTimeout(() => {
-        this.geometriasValidas = this.polygonSeries.mapPolygons.length;
-        console.log(`✓ Polígonos renderizados: ${this.geometriasValidas}`);
-        this.chart.goHome();
-      }, 100);
-    },
-
-    subirNivel() {
-      if (this.historialNavegacion.length > 0) {
-        const estadoAnterior = this.historialNavegacion.pop();
-        
-        console.log(`⬆️ Regresando a nivel: ${estadoAnterior.nivel}`);
-        
-        this.chart.geodata = estadoAnterior.geodata;
-        this.nivelActual = estadoAnterior.nivel;
-        this.tituloActual = estadoAnterior.titulo;
-        this.cantidadFeatures = estadoAnterior.geodata.features.length;
-        
-        setTimeout(() => {
-          this.geometriasValidas = this.polygonSeries.mapPolygons.length;
-          this.chart.goHome();
-        }, 100);
-      }
-    },
-
-    /**
-     * Corrige el winding order de los polígonos GeoJSON.
-     * amCharts 4 espera que el anillo exterior sea counter-clockwise.
-     * Muchos GIS exportan en clockwise. Esto causa que el polígono
-     * se renderice como "todo el mundo menos el polígono".
-     */
-    corregirGeoJSON(geojsonOriginal) {
-      // Crear copia profunda para no mutar prop original
-      const geojson = JSON.parse(JSON.stringify(geojsonOriginal));
-
-      if (!geojson.features) return geojson;
-
-      geojson.features.forEach(feature => {
-        const geometry = feature.geometry;
-        if (!geometry) return;
-
-        if (geometry.type === "Polygon") {
-          // geometry.coordinates es Array<Array<[lon, lat]>>
-          // Anillo 0 es exterior, otros son agujeros
-          geometry.coordinates.forEach(ring => {
-            ring.reverse();
-          });
-        } else if (geometry.type === "MultiPolygon") {
-          // geometry.coordinates es Array<Array<Array<[lon, lat]>>>
-          geometry.coordinates.forEach(polygon => {
-            polygon.forEach(ring => {
-              ring.reverse();
-            });
-          });
-        }
-      });
-
-      return geojson;
-    },
-  },
-};
+onUnmounted(() => {
+  if (chart) {
+    chart.dispose()
+  }
+})
 </script>
 
 <style scoped>
@@ -374,72 +366,69 @@ export default {
   position: relative;
   width: 100%;
   height: 600px;
-  background: #f5f5f5; /* Fondo para ver si el contenedor está visible */
+  background: #f5f5f5;
 }
+
 .contenedor-mapa {
   width: 100%;
   height: 100%;
 }
+
 .boton-regresar {
   position: absolute;
   top: 20px;
   right: 20px;
   z-index: 10;
   background: white;
-  padding: 10px 20px;
-  border-radius: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 8px 16px;
+  border-radius: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   cursor: pointer;
-  font-family: "Roboto", sans-serif;
-  font-weight: 500;
-  color: #555;
+  font-family: var(--fuente-principal, sans-serif);
+  font-size: 0.9rem;
   display: flex;
   align-items: center;
-  transition: all 0.2s;
+  gap: 8px;
+  transition: transform 0.2s;
 }
+
 .boton-regresar:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  color: #000;
 }
+
 .titulo-area {
   position: absolute;
   top: 20px;
   left: 20px;
   z-index: 10;
-  font-family: "Oswald", sans-serif;
-  font-size: 1.8rem;
-  font-weight: 600;
-  color: #2c3e50;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 10px 20px;
-  border-radius: 8px;
+  font-family: var(--fuente-titulos, sans-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  background: rgba(255,255,255,0.9);
+  padding: 5px 15px;
+  border-radius: 4px;
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
+
 .panel-debug {
   position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.85);
-  color: #00ff00;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-family: "Courier New", monospace;
-  font-size: 0.75rem;
-  max-width: 320px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0,0,0,0.8);
+  color: #0f0;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 12px;
+  border-radius: 4px;
+  pointer-events: none;
 }
-.debug-item {
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s;
 }
-.fade-enter,
+.fade-enter-from,
 .fade-leave-to {
   opacity: 0;
 }
