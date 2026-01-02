@@ -1,6 +1,6 @@
 <template>
     <v-sheet class="position-relative overflow-hidden">
-        <v-navigation-drawer v-model="drawer" absolute temporary width="300" color="#12a2c2" dark>
+        <v-navigation-drawer v-model="drawer" app absolute temporary width="300" color="#12a2c2" dark>
             <v-container class="contenedor-filtros">
                 <h3 class="mb-4 text-uppercase" style="font-family: var(--fuente-titulos);">
                     Seleccionar en Filtro
@@ -37,7 +37,7 @@
             <v-icon>mdi-magnify</v-icon>
         </v-btn>
 
-        <v-container fluid class="fondo-general">
+        <v-container fluid class="fondo-general" style="min-height: 100vh;">
             <v-row no-gutters>
                 <v-card outlined color="transparent" width="100%">
                     <v-row no-gutters>
@@ -69,12 +69,11 @@
                     </v-row>
 
                     <v-row>
-                        <v-col cols="12" md="9">
-                            <div class="text-center pa-10 white--text" style="font-family: var(--fuente-principal);">
-                                <v-progress-circular indeterminate color="white"></v-progress-circular>
-                                <p class="mt-4">Preparando visualización cartográfica nacional...</p>
-                            </div>
+                        <v-col cols="12" md="9" style="min-height: 600px;">
+                            <MapaEcuador v-if="jsonProv && jsonProv.features" :provincias="jsonProv"
+                                :cantones="jsonCant" :parroquias="jsonParr" :vuelta="vueltaSeleccionada" />
                         </v-col>
+
                         <v-col cols="12" md="3">
                             <v-card class="pa-4 text-center">
                                 <h3 style="font-family: var(--fuente-titulos);">Tarjetas Pendientes</h3>
@@ -88,8 +87,15 @@
 </template>
 
 <script>
+import MapaEcuador from "./MapaEcuador.vue";
+import provData from "@/assets/GeoJson/ProvinciasEcu.json";
+import cantData from "@/assets/GeoJson/CantonesEcu.json";
+import parrData from "@/assets/GeoJson/ParroquiasEcu.json";
 export default {
     name: "MapaNacional",
+    components: {
+        MapaEcuador,
+    },
     data: () => ({
         drawer: false,
         vueltaSeleccionada: 1,
@@ -97,11 +103,23 @@ export default {
         filtroPartido: '',
         filtroProvincia: '',
         filtroCanton: '',
+        jsonProv: provData,
+        jsonCant: cantData,
+        jsonParr: parrData,
         itemsVuelta: ['Primera Vuelta', 'Segunda Vuelta'],
         itemsPartido: ['Alianza Creo 21 Psc 6', 'Unión Por La Esperanza', 'Pachakutik', 'Izquierda Democrática'],
-        itemsProvincia: ['Pichincha', 'Guayas', 'Manabí', 'Azuay', 'Santa Elena'],
         itemsCanton: []
     }),
+
+
+    computed: {
+        itemsProvincia() {
+            if (!this.jsonProv || !this.jsonProv.features) return [];
+
+            const nombres = this.jsonProv.features.map(f => f.properties.PROVINCIA);
+            return [...new Set(nombres)].sort();
+        }
+    },
     methods: {
         setVuelta(num) {
             this.vueltaSeleccionada = num;
