@@ -1,6 +1,6 @@
 <template>
-  <div class="wrapper-mapa-transparente">
-    <div id="chartdiv" class="mapa-full-size"></div>
+  <div class="mapa-ecuador">
+    <div id="chartdiv"></div>
   </div>
 </template>
 
@@ -13,7 +13,7 @@ am4core.useTheme(am4themes_animated);
 
 export default {
   name: "MapaEcuador",
-  props: ["provincias", "cantones", "parroquias", "vuelta"],
+  props: ["provincias", "cantones", "parroquias"],
   data: () => ({
     chart: null,
     nivelActual: "provincias"
@@ -23,30 +23,58 @@ export default {
   },
   methods: {
     iniciarMapa() {
+
+      if (this.chart) {
+        this.chart.dispose();
+      }
+
       let chart = am4core.create("chartdiv", am4maps.MapChart);
       chart.projection = new am4maps.projections.Miller();
       chart.geodata = this.corregirGeoJSON(this.provincias);
-      
-      chart.background.fillOpacity = 0;
-      chart.chartContainer.wheelable = false;
-      chart.seriesContainer.draggable = true;
-      chart.padding(0, 0, 0, 0);
 
+      chart.background.fillOpacity = 0;
+      chart.padding(0, 0, 0, 0);
+      chart.chartContainer.wheelable = false;
+
+
+      chart.exporting.menu = new am4core.ExportMenu();
+      chart.exporting.menu.align = "right";
+      chart.exporting.menu.verticalAlign = "top";
+      chart.exporting.menu.items = [{
+        label: "",
+        icon: "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23546E7A' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/%3E%3C/svg%3E",
+        menu: [
+          { label: "Imagen", menu: [{ type: "png", label: "PNG" }, { type: "jpg", label: "JPG" }, { type: "pdf", label: "PDF" }] },
+          { label: "Datos", menu: [{ type: "json", label: "JSON" }, { type: "csv", label: "CSV" }] },
+          { label: "Imprimir", type: "print" }
+        ]
+      }];
+
+      // CONTROLES DE ZOOM
       chart.zoomControl = new am4maps.ZoomControl();
       chart.zoomControl.align = "right";
       chart.zoomControl.valign = "bottom";
-      chart.zoomControl.marginRight = 20;
-      chart.zoomControl.marginBottom = 20;
+      chart.zoomControl.marginRight = 10;
+      chart.zoomControl.marginBottom = 10;
+
 
       let homeButton = chart.zoomControl.createChild(am4core.Button);
-      homeButton.icon = new am4core.Sprite();
-      homeButton.icon.path = "M16,1L1,12h3v11h5v-6h4v6h5V12h3L16,1z";
       homeButton.width = 30;
       homeButton.height = 30;
-      homeButton.index = 0; 
-      homeButton.events.on("hit", () => {
-        this.regresarNivelNacional();
-      });
+      homeButton.padding(0, 0, 0, 0);
+
+      homeButton.icon = new am4core.Sprite();
+
+      homeButton.icon.path = "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z";
+      homeButton.icon.align = "center";
+      homeButton.icon.valign = "middle";
+
+
+      homeButton.toBack();
+      chart.zoomControl.plusButton.index = 1;
+      chart.zoomControl.minusButton.index = 2;
+
+      homeButton.events.on("hit", () => this.regresarNivelNacional());
 
       let polygonSeries = chart.series.push(new am4maps.MapPolygonSeries());
       polygonSeries.useGeodata = true;
@@ -55,30 +83,41 @@ export default {
       let polygonTemplate = polygonSeries.mapPolygons.template;
       polygonTemplate.fill = am4core.color("#12a2c2").lighten(0.3);
       polygonTemplate.stroke = am4core.color("#FFFFFF");
-      polygonTemplate.strokeWidth = 1.5;
+      polygonTemplate.strokeWidth = 0.5;
 
-      polygonTemplate.tooltipHTML = `
-        <div style="background-color: #1a5276; color: white; padding: 10px; border: 1px solid #fff; border-radius: 4px; text-align: center;">
-          <div style="font-weight: bold; text-transform: uppercase; font-size: 14px;">{name}</div>
-          <div style="font-size: 11px; margin-top:4px;">Ganador: {ganador}</div>
-          <div style="font-size: 11px;">Votos: {votos}</div>
-          <div style="font-size: 11px;">Porcentaje: {porcentaje}%</div>
-        </div>
-      `;
+polygonTemplate.tooltipHTML = `
+  <div style="
+    background-color: #1a5276; 
+    padding: 15px; 
+    border: 1px solid #ffffff; 
+    border-radius: 4px;
+    text-align: left;
+    min-width: 160px;
+    font-family: 'Oswald', sans-serif;
+  ">
+    <div style="
+      font-weight: bold; 
+      font-size: 16px; 
+      color: #ffffff; 
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    ">{name}</div>
 
-      polygonTemplate.adapter.add("fill", (fill, target) => {
-        if (target.dataItem.dataContext) {
-          if (this.nivelActual === "provincias") return am4core.color("#12a2c2").lighten(0.3);
-          if (this.nivelActual === "cantones") return am4core.color("#1a5276").lighten(0.4);
-          return am4core.color("#e67e22").lighten(0.3);
-        }
-        return fill;
-      });
+    <div style="font-size: 14px; color: #ffffff; margin-bottom: 2px;">
+      Ganador: <span style="font-weight: 300;">{ganador}</span>
+    </div>
 
-      polygonTemplate.events.on("hit", (ev) => {
-        this.manejarClick(ev.target.dataItem.dataContext);
-      });
+    <div style="font-size: 14px; color: #ffffff; margin-bottom: 2px;">
+      Votos: <span style="font-weight: 300;">{votos}</span>
+    </div>
 
+    <div style="font-size: 14px; font-weight: bold; color: #ffffff;">
+      Porcentaje: {porcentaje}%
+    </div>
+  </div>
+`;
+
+      polygonTemplate.events.on("hit", (ev) => this.manejarClick(ev.target.dataItem.dataContext));
       this.chart = chart;
     },
     manejarClick(data) {
@@ -87,9 +126,7 @@ export default {
         this.actualizarMapa(filtrados, "cantones");
       } else if (this.nivelActual === "cantones") {
         const filtrados = this.parroquias.features.filter(f => f.properties.CODCAN === data.CODCAN);
-        if (filtrados.length > 0) {
-          this.actualizarMapa(filtrados, "parroquias");
-        }
+        if (filtrados.length > 0) this.actualizarMapa(filtrados, "parroquias");
       }
     },
     actualizarMapa(features, nivel) {
@@ -107,9 +144,6 @@ export default {
       let copia = JSON.parse(JSON.stringify(json));
       copia.features.forEach(f => {
         f.properties.name = f.properties.PARROQUIA || f.properties.CANTON || f.properties.PROVINCIA;
-        f.properties.ganador = "Alianza 1996";
-        f.properties.votos = "12,350";
-        f.properties.porcentaje = "45.8";
         if (f.geometry.type === "Polygon") {
           f.geometry.coordinates.forEach(r => r.reverse());
         } else if (f.geometry.type === "MultiPolygon") {
@@ -120,23 +154,37 @@ export default {
     }
   },
   beforeDestroy() {
-    if (this.chart) this.chart.dispose();
+    if (this.chart) {
+      this.chart.dispose();
+    }
   }
 };
 </script>
 
 <style scoped>
-.wrapper-mapa-transparente { 
-  width: 100%; 
-  height: 100%;
-  background: transparent !important; 
-}
-.mapa-full-size {
+.mapa-ecuador {
   width: 100%;
-  height: 750px; 
+  height: 600px;
   background: transparent !important;
 }
+
 #chartdiv {
-  outline: none;
+  width: 100%;
+  height: 100%;
+}
+
+
+
+::v-deep .amcharts-tooltip {
+  pointer-events: none;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+
+::v-deep .amcharts-tooltip div {
+  background-color: transparent !important;
+  border: none !important;
 }
 </style>
