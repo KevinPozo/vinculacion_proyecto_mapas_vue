@@ -222,6 +222,20 @@ export default {
       chart.zoomControl.align = "right";
       chart.zoomControl.valign = "bottom";
 
+      // Botón de Inicio (Home)
+      let homeButton = new am4core.Button();
+      homeButton.events.on("hit", function () {
+        chart.goHome();
+      });
+
+      homeButton.icon = new am4core.Sprite();
+      homeButton.padding(7, 5, 7, 5);
+      homeButton.width = 30;
+      homeButton.icon.path = "M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z";
+      homeButton.marginBottom = 10;
+      homeButton.parent = chart.zoomControl;
+      homeButton.insertBefore(chart.zoomControl.plusButton);
+
       // --- CONFIGURACIÓN DE EXPORTACIÓN (Copiado de MapaMundi) ---
       if (this.configuracion.exportar !== false) {
         chart.exporting.menu = new am4core.ExportMenu();
@@ -282,22 +296,15 @@ export default {
   position: relative;
 }
 
-::v-deep .amcharts-export-menu ul {
-  background: #ffffff;
-  padding: 0;
-  list-style: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-}
-
-::v-deep .amcharts-export-menu li {
-  padding: 8px 16px;
-  cursor: pointer;
-  color: #333;
-}
-
-::v-deep .amcharts-export-menu li:hover {
+::v-deep .amcharts-amexport-item:hover {
   background: #f5f5f5;
   color: #000;
+}
+
+/* LABEL (Texto de los items) */
+::v-deep .amcharts-amexport-label {
+  display: block;
+  text-decoration: none;
+  color: inherit;
 }
 </style>

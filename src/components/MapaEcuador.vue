@@ -189,7 +189,7 @@ const handleGoBack = () => {
 
 .boton-regresar {
   position: absolute;
-  top: 20px;
+  top: -38px;
   right: 20px;
   z-index: 10;
   background: white;
