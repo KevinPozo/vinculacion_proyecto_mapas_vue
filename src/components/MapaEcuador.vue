@@ -97,7 +97,8 @@
 
                 <div class="titulo-area">{{ tituloActual }}</div>
 
-                <MapaElectoral ref="mapaRef" @region-selected="onRegionSelected" @level-change="onLevelChange" />
+                <MapaElectoral class="componente-mapa" ref="mapaRef" @region-selected="onRegionSelected"
+                  @level-change="onLevelChange" />
               </div>
             </v-col>
             <v-col cols="12" md="3">
@@ -112,71 +113,79 @@
   </v-sheet>
 </template>
 
-<script setup>
+<script>
 /**
  * @file MapaEcuador.vue
- * @description VISTA PRINCIPAL (Contenedor). 
+ * @description VISTA PRINCIPAL (Contenedor).
  * Muestra filtros, barra lateral y carga el componente MapaElectoral.
  */
 
-import { ref, computed } from "vue";
 import MapaElectoral from "./MapaElectoral.vue";
 
-// --- STATE UI ---
-const drawer = ref(false);
-const esPrimeraVuelta = ref(true);
+export default {
+  name: "MapaEcuador",
+  components: {
+    MapaElectoral,
+  },
+  data() {
+    return {
+      // --- STATE UI ---
+      drawer: false,
+      esPrimeraVuelta: true,
 
-// --- FILTROS ---
-const filtroVuelta = ref(null);
-const filtroPartido = ref(null);
-const filtroProvincia = ref(null);
-const filtroCanton = ref(null);
-const filtroParroquia = ref(null);
+      // --- FILTROS ---
+      filtroVuelta: null,
+      filtroPartido: null,
+      filtroProvincia: null,
+      filtroCanton: null,
+      filtroParroquia: null,
 
-const itemsVuelta = ["Primera Vuelta", "Segunda Vuelta"];
-const itemsPartido = ["Partido A", "Partido B"]; // TODO: Cargar real
-const itemsProvincia = [];
-const itemsCanton = [];
-const itemsParroquia = [];
+      itemsVuelta: ["Primera Vuelta", "Segunda Vuelta"],
+      itemsPartido: ["Partido A", "Partido B"], // TODO: Cargar real
+      itemsProvincia: [],
+      itemsCanton: [],
+      itemsParroquia: [],
 
-// --- MAPA STATE ---
-const mapaRef = ref(null);
-const nivelActual = ref("provincias");
-const tituloActual = ref("Ecuador");
-const puedeRegresar = ref(false);
+      // --- MAPA STATE ---
+      nivelActual: "provincias",
+      tituloActual: "Ecuador",
+      puedeRegresar: false,
+    };
+  },
+  computed: {
+    nombreNivelSuperior() {
+      return this.nivelActual === "parroquias" ? "Cantón" : "Ecuador";
+    },
+  },
+  methods: {
+    // --- HANDLERS ---
+    setVuelta(vuelta) {
+      this.esPrimeraVuelta = vuelta === 1;
+    },
 
-const nombreNivelSuperior = computed(() => {
-  return nivelActual.value === "parroquias" ? "Cantón" : "Ecuador";
-});
+    aplicarFiltros() {
+      console.log("Aplicando filtros...");
+      this.drawer = false;
+    },
 
+    onRegionSelected(data) {
+      console.log("Region seleccionada en vista:", data);
+      // Aquí podríamos actualizar tarjetas de info o cargar datos especificos
+    },
 
-// --- HANDLERS ---
-const setVuelta = (vuelta) => {
-  esPrimeraVuelta.value = vuelta === 1;
+    onLevelChange(estado) {
+      this.nivelActual = estado.nivel;
+      this.tituloActual = estado.titulo;
+      this.puedeRegresar = estado.puedeRegresar;
+    },
+
+    handleGoBack() {
+      if (this.$refs.mapaRef) {
+        this.$refs.mapaRef.regresarNivel();
+      }
+    },
+  },
 };
-
-const aplicarFiltros = () => {
-  console.log("Aplicando filtros...");
-  drawer.value = false;
-};
-
-const onRegionSelected = (data) => {
-  console.log("Region seleccionada en vista:", data);
-  // Aquí podríamos actualizar tarjetas de info o cargar datos especificos
-};
-
-const onLevelChange = (estado) => {
-  nivelActual.value = estado.nivel;
-  tituloActual.value = estado.titulo;
-  puedeRegresar.value = estado.puedeRegresar;
-};
-
-const handleGoBack = () => {
-  if (mapaRef.value) {
-    mapaRef.value.regresarNivel();
-  }
-};
-
 </script>
 
 <style scoped>
@@ -211,7 +220,7 @@ const handleGoBack = () => {
 
 .titulo-area {
   position: absolute;
-  top: 20px;
+  top: -38px;
   left: 20px;
   z-index: 10;
   font-family: var(--fuente-titulos, sans-serif);
@@ -266,7 +275,7 @@ const handleGoBack = () => {
 .contenedor-botones-vuelta {
   display: flex;
   justify-content: center;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 .btn-vuelta {
@@ -287,5 +296,64 @@ const handleGoBack = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+
+.componente-mapa {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 600px) {
+  .contenedor-botones-vuelta {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0px;
+  }
+
+  .wrapper-mapa {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: auto;
+    min-height: 500px;
+    padding-top: 10px;
+  }
+
+  .titulo-area {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    transform: none;
+
+    order: 1;
+    width: 90%;
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+  }
+
+  .boton-regresar {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    transform: none;
+
+    order: 2;
+    margin-bottom: 20px;
+    width: auto;
+    font-size: 0.8rem;
+  }
+
+  .boton-regresar:hover {
+    transform: translateY(-2px);
+  }
+
+  .componente-mapa {
+    order: 3;
+    height: 500px;
+  }
 }
 </style>

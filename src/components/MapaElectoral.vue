@@ -143,6 +143,11 @@ export default {
         titulo: this.tituloActual,
       });
 
+      // Forzar cierre de tooltips
+      if (this.chart && this.chart.tooltip) {
+        this.chart.tooltip.hide();
+      }
+
       const nuevoGeoJSON = {
         type: "FeatureCollection",
         features: nuevosFeatures,
@@ -176,6 +181,11 @@ export default {
         this.chart.geodata = estadoAnterior.geodata;
         this.nivelActual = estadoAnterior.nivel;
         this.tituloActual = estadoAnterior.titulo;
+
+        // Forzar cierre de tooltips
+        if (this.chart && this.chart.tooltip) {
+          this.chart.tooltip.hide();
+        }
 
         this.$emit("level-change", {
           nivel: this.nivelActual,
