@@ -34,8 +34,8 @@
             </v-container>
         </v-navigation-drawer>
 
-        <v-btn color="#12a2c2" dark fab small fixed top left
-            style="margin-top: 20px; margin-left: 20px; z-index: 5000 !important;" @click="drawer = !drawer">
+        <v-btn color="#12a2c2" rounded="lg" size="big" class="position-fixed"
+            style="top: 20px; left: 20px; z-index: 5000 !important; min-width: 50px; min-height: 30px;" @click="drawer = !drawer">
             <v-icon>mdi-magnify</v-icon>
         </v-btn>
 
