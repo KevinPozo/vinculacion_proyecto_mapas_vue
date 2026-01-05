@@ -1,12 +1,9 @@
 <template>
   <div>
     <MapaNacional
-      :geoProvincias="jsonProvincias"
-      :geoCantones="jsonCantones"
-      :geoParroquias="jsonParroquias"
-      :rawResultadosProv="resProvincias"
-      :rawResultadosCan="resCantones"
-      :rawResultadosParr="resParroquias"
+      :geoProvincias="geoProvincias"
+      :geoCantones="geoCantones"
+      :geoParroquias="geoParroquias"
     />
   </div>
 </template>
@@ -25,7 +22,6 @@ export default {
   data() {
     return {
       geoProvincias, geoCantones, geoParroquias,
-      resProvincias, resCantones, resParroquias
     };
   },
 };

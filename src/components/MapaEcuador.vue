@@ -81,6 +81,35 @@ export default {
         });
       }
     },
+    goBack() {
+      if (!this.chart) return;
+
+      // 1. Si estamos viendo Parroquias (Nivel 3) -> Volver a Cantones
+      if (this.cantonSeries.visible) {
+        this.cantonSeries.hide();
+        // Limpiamos la geodata para liberar memoria
+        this.cantonSeries.geodata = { type: "FeatureCollection", features: [] };
+
+        this.provinciaSeries.show();
+
+        // --- CORRECCIÓN ---
+        // En lugar de intentar un zoom complejo, simplemente dejamos la vista como está
+        // o si prefieres centrar, usamos goHome() que es seguro.
+        // Si quieres que el usuario vea la provincia entera de nuevo:
+        // this.chart.goHome();
+
+        return;
+      }
+
+      // 2. Si estamos viendo Cantones (Nivel 2) -> Volver a País
+      if (this.provinciaSeries.visible) {
+        this.resetMapToHome();
+        return;
+      }
+
+      // 3. Si ya estamos en el inicio
+      this.chart.goHome();
+    },
     processData(datos) {
       if (!datos) return [];
       return datos.map((item) => {
@@ -174,7 +203,7 @@ export default {
       // Botón Regresar
       let back = new am4core.Button();
       back.events.on("hit", () => {
-        this.resetMapToHome();
+        this.goBack();
       });
       back.icon = new am4core.Sprite();
       back.padding(7, 5, 7, 5);
