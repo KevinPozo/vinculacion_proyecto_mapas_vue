@@ -1,16 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 
 import PaginaResultadosExtranjero from "@/views/PaginaResultadosExtranjero.vue";
-import PaginaResultadoNacional from "@/views/PaginaResultadoNacional.vue";
+import PaginaResultadoNacional from "@/views/PaginaResultadosNacional.vue";
 const routes = [
   {
     path: "/",
     name: "Home",
-    component: PaginaResultadoNacional,
-  },
-  {
-    path: "/nacional",
-    name: "Nacional",
     component: PaginaResultadoNacional,
   },
   {

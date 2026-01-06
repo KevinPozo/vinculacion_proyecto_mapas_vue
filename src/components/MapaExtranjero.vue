@@ -84,57 +84,47 @@
 
 <script>
 import MapaMundi from "./MapaMundi.vue";
-import {
-  getColorPartido,
-} from "@/assets/Informacion/ColoresPartidos.js";
 
-const DATOS_MOCK_1RA = [
-  { id: "ES", name: "España", ganador: "UNES", id_partido: "2", votos: 45000 },
-  { id: "IT", name: "Italia", ganador: "UNES", id_partido: "2", votos: 32000 },
-  { id: "US", name: "Estados Unidos", ganador: "CREO-PSC", id_partido: "1", votos: 58000 },
-  { id: "CA", name: "Canadá", ganador: "Pachakutik", id_partido: "3", votos: 5000 },
-  { id: "VE", name: "Venezuela", ganador: "UNES", id_partido: "2", votos: 12000 },
-  { id: "CO", name: "Colombia", ganador: "CREO-PSC", id_partido: "1", votos: 8000 },
-  { id: "PE", name: "Perú", ganador: "Izquierda Democrática", id_partido: "4", votos: 4500 },
-  { id: "CL", name: "Chile", ganador: "Pachakutik", id_partido: "3", votos: 3000 },
-  { id: "AR", name: "Argentina", ganador: "UNES", id_partido: "2", votos: 6500 },
-  { id: "BR", name: "Brasil", ganador: "Mov. Construye", id_partido: "11", votos: 2000 },
-  { id: "MX", name: "México", ganador: "CREO-PSC", id_partido: "1", votos: 3200 },
-  { id: "RU", name: "Rusia", ganador: "UNES", id_partido: "2", votos: 1800 },
-  { id: "CN", name: "China", ganador: "Alianza País", id_partido: "9", votos: 1500 },
-  { id: "JP", name: "Japón", ganador: "CREO-PSC", id_partido: "1", votos: 800 },
-  { id: "AU", name: "Australia", ganador: "Pachakutik", id_partido: "3", votos: 900 },
-  { id: "GB", name: "Reino Unido", ganador: "CREO-PSC", id_partido: "1", votos: 4100 },
-  { id: "FR", name: "Francia", ganador: "Izquierda Democrática", id_partido: "4", votos: 3600 },
-  { id: "DE", name: "Alemania", ganador: "Pachakutik", id_partido: "3", votos: 2900 },
-];
-
-const DATOS_MOCK_2DA = [
-  { id: "ES", name: "España", ganador: "UNES", id_partido: "2", votos: 55000 },
-  { id: "IT", name: "Italia", ganador: "UNES", id_partido: "2", votos: 38000 },
-  { id: "US", name: "Estados Unidos", ganador: "CREO-PSC", id_partido: "1", votos: 65000 },
-  { id: "CA", name: "Canadá", ganador: "CREO-PSC", id_partido: "1", votos: 6000 },
-  { id: "VE", name: "Venezuela", ganador: "UNES", id_partido: "2", votos: 15000 },
-  { id: "CO", name: "Colombia", ganador: "CREO-PSC", id_partido: "1", votos: 9500 },
-  { id: "PE", name: "Perú", ganador: "CREO-PSC", id_partido: "1", votos: 5500 },
-  { id: "CL", name: "Chile", ganador: "CREO-PSC", id_partido: "1", votos: 4000 },
-  { id: "AR", name: "Argentina", ganador: "UNES", id_partido: "2", votos: 7500 },
-  { id: "BR", name: "Brasil", ganador: "UNES", id_partido: "2", votos: 2800 },
-  { id: "MX", name: "México", ganador: "CREO-PSC", id_partido: "1", votos: 4000 },
-  { id: "RU", name: "Rusia", ganador: "UNES", id_partido: "2", votos: 2200 },
-  { id: "CN", name: "China", ganador: "UNES", id_partido: "2", votos: 1900 },
-  { id: "JP", name: "Japón", ganador: "CREO-PSC", id_partido: "1", votos: 1100 },
-  { id: "AU", name: "Australia", ganador: "CREO-PSC", id_partido: "1", votos: 1200 },
-  { id: "GB", name: "Reino Unido", ganador: "CREO-PSC", id_partido: "1", votos: 5200 },
-  { id: "FR", name: "Francia", ganador: "UNES", id_partido: "2", votos: 4800 },
-  { id: "DE", name: "Alemania", ganador: "CREO-PSC", id_partido: "1", votos: 3500 },
-];
+const NAME_TO_ISO = {
+  "ESPAÑA": "ES",
+  "ITALIA": "IT",
+  "ESTADOS UNIDOS": "US",
+  "CANADA": "CA",
+  "CANADÁ": "CA",
+  "VENEZUELA": "VE",
+  "COLOMBIA": "CO",
+  "PERU": "PE",
+  "PERÚ": "PE",
+  "CHILE": "CL",
+  "ARGENTINA": "AR",
+  "BRASIL": "BR",
+  "MEXICO": "MX",
+  "MÉXICO": "MX",
+  "RUSIA": "RU",
+  "CHINA": "CN",
+  "JAPON": "JP",
+  "JAPÓN": "JP",
+  "AUSTRALIA": "AU",
+  "REINO UNIDO": "GB",
+  "FRANCIA": "FR",
+  "ALEMANIA": "DE",
+  "SUIZA": "CH",
+  "BELGICA": "BE",
+  "BÉLGICA": "BE",
+  "PAISES BAJOS": "NL",
+  "SUECIA": "SE"
+};
 
 export default {
   name: "MapaExtranjero",
 
   components: {
     MapaMundi,
+  },
+
+  props: {
+    resultadosCantones: { type: Array, default: () => [] },
+    colores: { type: Object, default: () => ({}) },
   },
 
   data() {
@@ -144,8 +134,6 @@ export default {
       filtroPartido: '',
       filtroPais: '',
       itemsVuelta: ['Primera Vuelta', 'Segunda Vuelta'],
-      itemsPartido: ['Alianza Creo 21 Psc 6', 'Unión Por La Esperanza', 'Pachakutik', 'Izquierda Democrática'],
-      itemsPais: ['España', 'Italia', 'Estados Unidos', 'Venezuela', 'Colombia'],
       vueltaSeleccionada: 1,
       configuracionMapa: {
         colorDefecto: "#CCC6C6",
@@ -159,18 +147,77 @@ export default {
     esPrimeraVuelta() {
       return this.vueltaSeleccionada === 1;
     },
+    itemsPais() {
+      if (!this.resultadosCantones || this.resultadosCantones.length === 0) return [];
+
+      const paises = this.resultadosCantones
+        .filter(c => c.CANTON && NAME_TO_ISO[c.CANTON.toUpperCase()])
+        .map(c => c.CANTON);
+      return [...new Set(paises)].sort();
+    },
+    itemsPartido() {
+      if (!this.colores) return [];
+      return Object.keys(this.colores).sort();
+    },
     datosParaMapa() {
-      const datosCrudos = this.esPrimeraVuelta ? DATOS_MOCK_1RA : DATOS_MOCK_2DA;
-      return datosCrudos.map((item) => {
-        const colorInfo = getColorPartido(item.id_partido);
-        return {
-          id: item.id,
-          colorHover: colorInfo.principal,
-          ganador: item.ganador,
-          votos: item.votos.toLocaleString(),
-          tooltipPersonalizado: `Ganador: [bold]${item.ganador}[/]\nVotos: ${item.votos.toLocaleString()}`,
-        };
+      if (!this.resultadosCantones || this.resultadosCantones.length === 0) return [];
+
+      const datosMapeados = [];
+
+      this.resultadosCantones.forEach(cantonData => {
+        const nombreCanton = cantonData.CANTON ? cantonData.CANTON.toUpperCase() : "";
+
+        if (this.filtroPais && this.filtroPais.toUpperCase() !== nombreCanton) {
+           return;
+        }
+
+        const isoCode = NAME_TO_ISO[nombreCanton];
+
+        if (isoCode) {
+           let winnerName = cantonData.ganador || "Desconocido";
+           let winnerVotes = 0;
+           let winnerPercent = 0;
+
+           let fill = "#cccccc";
+           let tooltipText = "";
+
+           if (this.filtroPartido && cantonData.resultados && cantonData.resultados[this.filtroPartido]) {
+              const partyData = cantonData.resultados[this.filtroPartido];
+              winnerName = this.filtroPartido;
+              winnerVotes = partyData.votos;
+              winnerPercent = partyData.porcentaje;
+              
+              const baseColor = this.colores[this.filtroPartido] ? (this.colores[this.filtroPartido].principal || this.colores[this.filtroPartido]) : "#666666";
+              fill = baseColor;
+              
+              tooltipText = `[bold]${nombreCanton}[/]\n${winnerName}: ${winnerVotes.toLocaleString()} (${winnerPercent}%)`;
+
+           } else {
+               if (cantonData.resultados && cantonData.resultados[winnerName]) {
+                 winnerVotes = cantonData.resultados[winnerName].votos;
+                 winnerPercent = cantonData.resultados[winnerName].porcentaje; 
+               }
+
+               if (this.colores[winnerName]) {
+                 fill = this.colores[winnerName].principal || this.colores[winnerName]; 
+               }
+               
+               tooltipText = `[bold]${nombreCanton}[/]\nGanador: ${winnerName}\nVotos: ${winnerVotes.toLocaleString()} (${winnerPercent}%)`;
+           }
+
+           datosMapeados.push({
+             id: isoCode,
+             name: nombreCanton,
+             fill: fill, 
+             colorHover: fill,
+             ganador: winnerName,
+             votos: winnerVotes.toLocaleString(),
+             tooltipPersonalizado: tooltipText
+           });
+        }
       });
+
+      return datosMapeados;
     },
   },
 

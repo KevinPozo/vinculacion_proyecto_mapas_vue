@@ -7,11 +7,6 @@ import * as am4core from "@amcharts/amcharts4/core";
 import * as am4maps from "@amcharts/amcharts4/maps";
 import am4themes_animated from "@amcharts/amcharts4/themes/animated";
 
-import {
-  getColorPartido,
-  COLORES_PARTIDOS,
-} from "@/assets/Informacion/ColoresPartidos";
-
 am4core.useTheme(am4themes_animated);
 
 export default {
@@ -22,18 +17,22 @@ export default {
     geoCantones: { type: Object, required: true },
     geoParroquias: { type: Object, required: true },
 
+    resultadosProvincias: { type: Array, default: () => [] },
+    resultadosCantones: { type: Array, default: () => [] },
+    resultadosParroquias: { type: Array, default: () => [] },
+
+    colores: { type: Object, default: () => ({}) },
+
     id_1: {
       type: Array,
       default: () => ["", "", 0, 0],
     },
     nvuelta: String,
-    datos: {
-      type: Array,
-      default: () => [],
-    },
   },
   data() {
-    return {};
+    return {
+      currentLevel: "PAIS",
+    };
   },
   created() {
     this.chart = null;
@@ -49,16 +48,16 @@ export default {
   watch: {
     id_1: {
       handler() {
-        this.updateMapData();
+        this.handleExternalFilter();
       },
       deep: true,
     },
-    datos: {
-      handler() {
-        this.updateMapData();
-      },
-      deep: true,
+    resultadosProvincias: {
+      handler() { this.updateMapData(); }, deep: true
     },
+    colores: {
+      handler() { this.updateMapData(); }, deep: true
+    }
   },
 
   unmounted() {
@@ -68,62 +67,86 @@ export default {
   },
 
   methods: {
+    normalizeId(id) {
+      return String(id).replace(/^0+/, "");
+    },
+
     fixGeoJsonIds(geoData) {
       if (geoData && geoData.features) {
         geoData.features.forEach((f) => {
           if (f.properties) {
-            const candidateId =
-              f.properties.id || f.properties.CODPRO || f.properties.CODCAN;
-            if (candidateId && !f.id) {
-              f.id = candidateId;
+            const rawId = f.properties.id || f.properties.CODPRO || f.properties.CODCAN || f.properties.CODPAR;
+            if (rawId) {
+              f.id = this.normalizeId(rawId);
             }
           }
         });
       }
     },
-    goBack() {
-      if (!this.chart) return;
+    getDataForLevel(level, parentId = null) {
+      let dataArray = [];
+      let idField = "";
+      let nameField = "";
 
-      // 1. Si estamos viendo Parroquias (Nivel 3) -> Volver a Cantones
-      if (this.cantonSeries.visible) {
-        this.cantonSeries.hide();
-        // Limpiamos la geodata para liberar memoria
-        this.cantonSeries.geodata = { type: "FeatureCollection", features: [] };
+      const [vuelta, partidoFilter, idProv, idCan] = this.id_1;
 
-        this.provinciaSeries.show();
-
-        // --- CORRECCIÓN ---
-        // En lugar de intentar un zoom complejo, simplemente dejamos la vista como está
-        // o si prefieres centrar, usamos goHome() que es seguro.
-        // Si quieres que el usuario vea la provincia entera de nuevo:
-        // this.chart.goHome();
-
-        return;
+      if (level === "PAIS") {
+        dataArray = this.resultadosProvincias;
+        idField = "CODPRO";
+        nameField = "PROVINCIA";
+      } else if (level === "PROVINCIA") {
+        dataArray = this.resultadosCantones.filter(d => this.normalizeId(d.CODPRO) === this.normalizeId(parentId));
+        idField = "CODCAN";
+        nameField = "CANTON";
+      } else if (level === "CANTON") {
+        dataArray = this.resultadosParroquias.filter(d => this.normalizeId(d.CODCAN) === this.normalizeId(parentId));
+        idField = "CODPAR";
+        nameField = "PARROQUIA";
       }
 
-      // 2. Si estamos viendo Cantones (Nivel 2) -> Volver a País
-      if (this.provinciaSeries.visible) {
-        this.resetMapToHome();
-        return;
-      }
+      if (!dataArray) return [];
 
-      // 3. Si ya estamos en el inicio
-      this.chart.goHome();
-    },
-    processData(datos) {
-      if (!datos) return [];
-      return datos.map((item) => {
-        const colorInfo = getColorPartido(item.partido_id);
-        const partidoInfo = COLORES_PARTIDOS[item.partido_id];
+      return dataArray.map((item) => {
+        let fill = "#cccccc";
+        let winnerName = item.ganador || "Desconocido";
+        let winnerCandidate = "";
+        let winnerVotes = 0;
+        let winnerPercent = 0;
+
+        if (partidoFilter && item.resultados && item.resultados[partidoFilter]) {
+          const partyData = item.resultados[partidoFilter];
+          winnerName = partidoFilter;
+          winnerCandidate = partyData.candidato;
+          winnerVotes = partyData.votos;
+          winnerPercent = partyData.porcentaje;
+
+          const baseColor = this.colores[partidoFilter] ? this.colores[partidoFilter].principal : "#666666";
+          fill = baseColor;
+        } else {
+          if (item.resultados && item.resultados[winnerName]) {
+            const winnerInfo = item.resultados[winnerName];
+            winnerCandidate = winnerInfo.candidato;
+            winnerVotes = winnerInfo.votos;
+            winnerPercent = winnerInfo.porcentaje;
+          }
+          const colorInfo = this.colores[winnerName] || { principal: "#cccccc" };
+          fill = colorInfo.principal;
+        }
+
         return {
-          ...item,
-          fill: colorInfo.principal,
-          winnerName: partidoInfo ? partidoInfo.nombre : "Desconocido",
+          id: this.normalizeId(item[idField]),
+          fill: fill,
+          winnerName: winnerName,
+          winnerCandidate: winnerCandidate,
+          winnerVotes: winnerVotes,
+          winnerPercent: winnerPercent,
+          name: item[nameField],
+          ...item
         };
       });
     },
+
     initMap() {
-      // USAMOS LAS PROPS (this.geo...)
       this.fixGeoJsonIds(this.geoProvincias);
       this.fixGeoJsonIds(this.geoCantones);
       this.fixGeoJsonIds(this.geoParroquias);
@@ -132,12 +155,10 @@ export default {
       chart.projection = new am4maps.projections.Miller();
       chart.zoomControl = new am4maps.ZoomControl();
 
-      // ... (Configuración de Export menú igual que antes) ...
-      chart.exporting.menu = new am4core.ExportMenu(); // Simplificado para brevedad
+      chart.exporting.menu = new am4core.ExportMenu();
 
-      // --- PAIS ---
       let pais = chart.series.push(new am4maps.MapPolygonSeries());
-      pais.geodata = this.geoProvincias; // <--- USAR PROP
+      pais.geodata = this.geoProvincias;
       pais.useGeodata = true;
       pais.reverseGeodata = true;
       this.paisSeries = pais;
@@ -148,13 +169,16 @@ export default {
       paisPolygon.strokeWidth = 0.5;
       paisPolygon.nonScalingStroke = true;
       paisPolygon.propertyFields.fill = "fill";
-      paisPolygon.tooltipText = "[bold]{PROVINCIA}[/]\nGanador: {winnerName}";
+
+      paisPolygon.tooltipText = `[bold]{PROVINCIA}[/]
+Ganador: {winnerName}
+Candidato: {winnerCandidate}
+Votos: {winnerVotes} ({winnerPercent}%)`;
 
       let hs = paisPolygon.states.create("hover");
       hs.properties.stroke = am4core.color("#000000");
       hs.properties.strokeWidth = 1;
 
-      // --- PROVINCIA ---
       let provincia = chart.series.push(new am4maps.MapPolygonSeries());
       provincia.useGeodata = true;
       provincia.reverseGeodata = true;
@@ -166,13 +190,16 @@ export default {
       provinciaPolygon.stroke = am4core.color("#000000");
       provinciaPolygon.strokeWidth = 0.5;
       provinciaPolygon.propertyFields.fill = "fill";
-      provinciaPolygon.tooltipText = "[bold]{CANTON}[/]\nGanador: {winnerName}";
+
+      provinciaPolygon.tooltipText = `[bold]{CANTON}[/]
+Ganador: {winnerName}
+Candidato: {winnerCandidate}
+Votos: {winnerVotes} ({winnerPercent}%)`;
 
       let hs2 = provinciaPolygon.states.create("hover");
       hs2.properties.stroke = am4core.color("#000000");
       hs2.properties.strokeWidth = 1;
 
-      // --- CANTON ---
       let canton = chart.series.push(new am4maps.MapPolygonSeries());
       canton.useGeodata = true;
       canton.reverseGeodata = true;
@@ -184,13 +211,16 @@ export default {
       cantonPolygon.stroke = am4core.color("#000000");
       cantonPolygon.strokeWidth = 0.5;
       cantonPolygon.propertyFields.fill = "fill";
-      cantonPolygon.tooltipText = "[bold]{PARROQUIA}[/]\nGanador: {winnerName}";
+
+      cantonPolygon.tooltipText = `[bold]{PARROQUIA}[/]
+Ganador: {winnerName}
+Candidato: {winnerCandidate}
+Votos: {winnerVotes} ({winnerPercent}%)`;
 
       let hs3 = cantonPolygon.states.create("hover");
       hs3.properties.stroke = am4core.color("#000000");
       hs3.properties.strokeWidth = 1;
 
-      // EVENTOS
       paisPolygon.events.on("hit", (ev) => {
         ev.target.series.chart.zoomToMapObject(ev.target);
         this.drillDownToProvince(ev.target.dataItem.dataContext);
@@ -200,16 +230,14 @@ export default {
         this.drillDownToCanton(ev.target.dataItem.dataContext);
       });
 
-      // Botón Regresar
       let back = new am4core.Button();
       back.events.on("hit", () => {
-        this.goBack();
+        this.resetMapToHome();
       });
       back.icon = new am4core.Sprite();
       back.padding(7, 5, 7, 5);
       back.width = 30;
-      back.icon.path =
-        "M16,8 L14,8 L14,16 L10,16 L10,10 L6,10 L6,16 L2,16 L2,8 L0,8 L8,0 L16,8 Z M16,8";
+      back.icon.path = "M16,8 L14,8 L14,16 L10,16 L10,10 L6,10 L6,16 L2,16 L2,8 L0,8 L8,0 L16,8 Z M16,8";
       back.parent = chart.zoomControl;
       back.insertBefore(chart.zoomControl.plusButton);
 
@@ -222,57 +250,111 @@ export default {
         canton.show();
       });
 
+      chart.events.on("zoomlevelchanged", () => {
+        if (this.currentLevel === "CANTON" && chart.zoomLevel < 3.5) {
+          this.goBack();
+        }
+        else if (this.currentLevel === "PROVINCIA" && chart.zoomLevel < 1.25) {
+          this.goBack();
+        }
+      });
+
       this.chart = chart;
     },
 
     updateMapData() {
       if (!this.chart) return;
-      const newData = this.processData(this.datos);
-      this.resetMapToHome();
-      this.paisSeries.data = newData;
-      this.provinciaSeries.data = newData;
-      this.cantonSeries.data = newData;
+      this.paisSeries.data = this.getDataForLevel("PAIS");
+    },
+
+    handleExternalFilter() {
+      const [vuelta, partido, idProv, idCan] = this.id_1;
+
+      if (idProv && idCan) {
+        this.resetMapToHome();
+        
+        const provPolygon = this.paisSeries.getPolygonById(this.normalizeId(idProv));
+        if (provPolygon) {
+          this.chart.zoomToMapObject(provPolygon);
+          this.drillDownToProvince(provPolygon.dataItem.dataContext);
+          
+          setTimeout(() => {
+            const canPolygon = this.provinciaSeries.getPolygonById(this.normalizeId(idCan));
+            if (canPolygon) {
+              this.chart.zoomToMapObject(canPolygon);
+              this.drillDownToCanton(canPolygon.dataItem.dataContext);
+            }
+          }, 1000); 
+        }
+      } else if (idProv) {
+        this.resetMapToHome();
+        const polygon = this.paisSeries.getPolygonById(this.normalizeId(idProv));
+        if (polygon) {
+          this.chart.zoomToMapObject(polygon);
+          this.drillDownToProvince(polygon.dataItem.dataContext);
+        }
+      } else {
+        if (this.currentLevel === "PAIS") {
+          this.updateMapData();
+        } else {
+          this.resetMapToHome();
+        }
+      }
     },
 
     resetMapToHome() {
       if (!this.chart) return;
       this.chart.goHome();
+      this.currentLevel = "PAIS";
       this.provinciaSeries.hide();
       this.cantonSeries.hide();
-      this.provinciaSeries.geodata = {
-        type: "FeatureCollection",
-        features: [],
-      };
-      this.cantonSeries.geodata = { type: "FeatureCollection", features: [] };
       this.paisSeries.show();
+    },
+
+    goBack() {
+      if (!this.chart) return;
+
+      if (this.cantonSeries.visible) {
+        this.cantonSeries.hide();
+        this.cantonSeries.geodata = { type: "FeatureCollection", features: [] };
+        this.provinciaSeries.show();
+        this.currentLevel = "PROVINCIA";
+        return;
+      }
+
+      if (this.provinciaSeries.visible) {
+        this.resetMapToHome();
+        return;
+      }
+
+      this.chart.goHome();
     },
 
     drillDownToProvince(dataContext) {
       try {
         let id = dataContext.id || dataContext.CODPRO;
 
-        // USAMOS PROP this.geoCantones
         let features = this.geoCantones.features || [];
         let provinceCantones = features.filter((f) => {
-          return (
-            String(f.properties.CODPRO).replace(/^0+/, "") ===
-            String(id).replace(/^0+/, "")
-          );
+          return this.normalizeId(f.properties.CODPRO) === this.normalizeId(id);
         });
 
         if (provinceCantones.length === 0) return;
 
         let freshFeatures = JSON.parse(JSON.stringify(provinceCantones));
+
         this.provinciaSeries.geodata = {
           type: "FeatureCollection",
           crs: this.geoCantones.crs,
           features: freshFeatures,
         };
-        this.provinciaSeries.data = this.processData(this.datos);
+
+        this.provinciaSeries.data = this.getDataForLevel("PROVINCIA", id);
         this.provinciaSeries.validateData();
 
         this.paisSeries.hide();
         this.provinciaSeries.show();
+        this.currentLevel = "PROVINCIA";
       } catch (error) {
         console.error(error);
       }
@@ -282,28 +364,27 @@ export default {
       try {
         let idCanton = dataContext.id || dataContext.CODCAN;
 
-        // USAMOS PROP this.geoParroquias
         let features = this.geoParroquias.features || [];
         let cantonParroquias = features.filter((f) => {
-          return (
-            String(f.properties.CODCAN).replace(/^0+/, "") ===
-            String(idCanton).replace(/^0+/, "")
-          );
+          return this.normalizeId(f.properties.CODCAN) === this.normalizeId(idCanton);
         });
 
         if (cantonParroquias.length === 0) return;
 
         let freshFeatures = JSON.parse(JSON.stringify(cantonParroquias));
+
         this.cantonSeries.geodata = {
           type: "FeatureCollection",
           crs: this.geoParroquias.crs,
           features: freshFeatures,
         };
-        this.cantonSeries.data = this.processData(this.datos);
+
+        this.cantonSeries.data = this.getDataForLevel("CANTON", idCanton);
         this.cantonSeries.validateData();
 
         this.provinciaSeries.hide();
         this.cantonSeries.show();
+        this.currentLevel = "CANTON";
       } catch (error) {
         console.error(error);
       }
@@ -317,6 +398,7 @@ export default {
   width: 100%;
   height: 500px;
 }
+
 ::v-deep .amcharts-export-menu ul {
   background: #ffffff;
   padding: 0;
@@ -324,11 +406,13 @@ export default {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
 }
+
 ::v-deep .amcharts-export-menu li {
   padding: 8px 16px;
   cursor: pointer;
   color: #333;
 }
+
 ::v-deep .amcharts-export-menu li:hover {
   background: #f5f5f5;
   color: #000;
