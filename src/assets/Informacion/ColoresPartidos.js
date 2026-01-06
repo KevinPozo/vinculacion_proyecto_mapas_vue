@@ -95,66 +95,65 @@ export const COLORES_PARTIDOS = {
     max: "#b5408c",
     principal: "#b5408c",
   },
-  // Mapping 2025 Parties to existing colors/styles or new ones if needed
   "ADN": {
     nombre: "ADN",
     min: "#bdd7e7",
     max: "#08519c",
-    principal: "#08519c", // Using ID 1 color
+    principal: "#08519c", 
   },
   "RC/RETO": {
     nombre: "RC/RETO",
     min: "#fdbe85",
     max: "#a63603",
-    principal: "#a63603", // Using ID 2 color
+    principal: "#a63603", 
   },
   "PSC": {
     nombre: "Partido Social Cristiano",
     min: "#f9e79f",
     max: "#D4AC0D",
-    principal: "#D4AC0D", // Using ID 11 color
+    principal: "#D4AC0D", 
   },
   "SUMA": {
     nombre: "SUMA",
     min: "#c7b69f",
     max: "#553d2a",
-    principal: "#553d2a", // Using ID 10 color
+    principal: "#553d2a", 
   },
   "PAIS": {
      nombre: "PAIS",
      min: "#A4DFBF",
      max: "#229954",
-     principal: "#229954" // Using ID 9 Color
+     principal: "#229954" 
   },
   "M. AMIGO": {
      nombre: "M. AMIGO",
      min: "#B1E1E7",
      max: "#35A0AC",
-     principal: "#35A0AC" // Using ID 5
+     principal: "#35A0AC" 
   },
   "AVANZA": {
     nombre: "AVANZA",
     min: "#f8bbd0",
     max: "#e91e63",
-    principal: "#e91e63" // Using ID 6
+    principal: "#e91e63" 
   },
   "ID": {
     nombre: "ID",
     min: "#fcdabc",
     max: "#e69237",
-    principal: "#e69237" // Using ID 4
+    principal: "#e69237"
   },
   "PSP": {
     nombre: "PSP",
     min: "#F5B7B1",
     max: "#E74C3C",
-    principal: "#E74C3C" // Using ID 7
+    principal: "#E74C3C" 
   },
   "PK-UP": {
     nombre: "PK-UP",
     min: "#cbaada",
     max: "#7D3C98",
-    principal: "#7D3C98" // Using ID 3
+    principal: "#7D3C98" 
   }
 };
 export function getColorPartido(id) {

@@ -6,6 +6,8 @@
 import * as am4core from "@amcharts/amcharts4/core";
 import * as am4maps from "@amcharts/amcharts4/maps";
 import am4themes_animated from "@amcharts/amcharts4/themes/animated";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 am4core.useTheme(am4themes_animated);
 
@@ -20,6 +22,7 @@ export default {
     resultadosProvincias: { type: Array, default: () => [] },
     resultadosCantones: { type: Array, default: () => [] },
     resultadosParroquias: { type: Array, default: () => [] },
+    datosDescarga: { type: Array, default: () => [] },
 
     colores: { type: Object, default: () => ({}) },
 
@@ -57,6 +60,13 @@ export default {
     },
     colores: {
       handler() { this.updateMapData(); }, deep: true
+    },
+    datosDescarga: {
+      handler(nuevosDatos) {
+        this.actualizarDatosExportacion(nuevosDatos);
+      },
+      deep: true,
+      immediate: true
     }
   },
 
@@ -156,6 +166,38 @@ export default {
       chart.zoomControl = new am4maps.ZoomControl();
 
       chart.exporting.menu = new am4core.ExportMenu();
+      const self = this;
+      chart.exporting.menu.items = [{
+          label: "",
+          icon: "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23546E7A' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/%3E%3C/svg%3E",
+          menu: [
+            {
+              label: "Imagen",
+              menu: [
+                { type: "png", label: "PNG" },
+                { type: "jpg", label: "JPG" },
+                { type: "svg", label: "SVG" },
+                { type: "pdf", label: "PDF" }
+              ]
+            },
+            {
+              label: "Datos",
+              menu: [
+                { label: "JSON", type: "custom", click: function() { self.descargarJSON(); } },
+                { label: "XLSX", type: "custom", click: function() { self.descargarXLSX(); } },
+                { label: "HTML", type: "custom", click: function() { self.descargarHTML(); } }
+              ]
+            },
+            {
+              label: "Imprimir",
+              type: "print",
+              label: "Imprimir"
+            }
+          ]
+        }];
+        chart.exporting.filePrefix = "mapa_ecuador_export";
+        
+        this.actualizarDatosExportacion(this.datosDescarga);
 
       let pais = chart.series.push(new am4maps.MapPolygonSeries());
       pais.geodata = this.geoProvincias;
@@ -389,6 +431,118 @@ Votos: {winnerVotes} ({winnerPercent}%)`;
         console.error(error);
       }
     },
+
+    actualizarDatosExportacion(datos) {
+      if (!this.chart || !this.chart.exporting) return;
+
+      if (datos && Array.isArray(datos) && datos.length > 0) {
+        try {
+          const datosPlanos = this.flattenElectionData(datos);
+          this.chart.exporting.data = datosPlanos;
+          this.datosExportacionProcesados = datosPlanos;
+        } catch (e) {
+          console.error("MapaEcuador: Error flattening data", e);
+          const raw = JSON.parse(JSON.stringify(datos));
+          this.chart.exporting.data = raw;
+          this.datosExportacionProcesados = raw;
+        }
+      }
+    },
+
+    flattenElectionData(data) {
+      if (!data || !Array.isArray(data)) return [];
+      
+      return data.map(item => {
+        let locationName = item.PROVINCIA || item.CANTON || item.PARROQUIA || "Desconocido";
+        
+        const flatItem = {
+          "Ubicación": locationName,
+          "Total de Votos": item.votos_validos || 0
+        };
+
+        if (item.resultados) {
+          const sortedCandidates = Object.values(item.resultados).sort((a, b) => b.votos - a.votos);
+          
+          if (sortedCandidates[0]) {
+            flatItem["Candidato 1"] = sortedCandidates[0].candidato;
+            flatItem["Votos Candidato 1"] = sortedCandidates[0].votos;
+          } else {
+             flatItem["Candidato 1"] = "";
+             flatItem["Votos Candidato 1"] = 0;
+          }
+
+          if (sortedCandidates[1]) {
+            flatItem["Candidato 2"] = sortedCandidates[1].candidato;
+            flatItem["Votos Candidato 2"] = sortedCandidates[1].votos;
+          } else {
+             flatItem["Candidato 2"] = "";
+             flatItem["Votos Candidato 2"] = 0;
+          }
+        } else {
+           flatItem["Candidato 1"] = "";
+           flatItem["Votos Candidato 1"] = 0;
+           flatItem["Candidato 2"] = "";
+           flatItem["Votos Candidato 2"] = 0;
+        }
+        return flatItem;
+      });
+    },
+
+    getDatosParaDescarga() {
+      return this.datosExportacionProcesados || this.datosDescarga || [];
+    },
+
+    descargarJSON() {
+      let datos = this.getDatosParaDescarga();
+      if (!datos || datos.length === 0) {
+        datos = this.flattenElectionData(this.datosDescarga);
+      }
+      const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json;charset=utf-8" });
+      saveAs(blob, "Ecuador_Resultados.json");
+    },
+
+    descargarXLSX() {
+      let datos = this.getDatosParaDescarga();
+      if (!datos || datos.length === 0) {
+        datos = this.flattenElectionData(this.datosDescarga);
+      }
+      if (!datos || datos.length === 0) return;
+
+      const ws = XLSX.utils.json_to_sheet(datos);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Provincias");
+      
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Ecuador_Resultados.xlsx");
+    },
+
+    descargarHTML() {
+       let datos = this.getDatosParaDescarga();
+       if (!datos || datos.length === 0) {
+        datos = this.flattenElectionData(this.datosDescarga);
+       }
+       if (!datos || datos.length === 0) return;
+
+       let html = "<html><head><style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; font-family: Arial; } th { background-color: #f2f2f2; }</style></head><body><h2>Resultados Electorales</h2><table>";
+       
+       const keys = Object.keys(datos[0]);
+       html += "<thead><tr>";
+       keys.forEach(k => html += `<th>${k}</th>`);
+       html += "</tr></thead><tbody>";
+
+       datos.forEach(row => {
+         html += "<tr>";
+         keys.forEach(k => html += `<td>${row[k] !== undefined && row[k] !== null ? row[k] : ""}</td>`);
+         html += "</tr>";
+       });
+
+       html += "</tbody></table></body></html>";
+       
+       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+       saveAs(blob, "Ecuador_Resultados.html");
+    }
+
+
   },
 };
 </script>

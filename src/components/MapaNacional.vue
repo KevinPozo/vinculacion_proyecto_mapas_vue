@@ -76,6 +76,7 @@
               <MapaEcuador :id_1="id_codMapa" :geoProvincias="geoProvincias" :geoCantones="geoCantones"
                 :geoParroquias="geoParroquias" :resultadosProvincias="resultadosProvincias"
                 :resultadosCantones="resultadosCantones" :resultadosParroquias="resultadosParroquias" :colores="colores"
+                :datosDescarga="datosExportacion"
                 @mapaTitulo="(i) => (tituloMapa = i)" />
             </v-col>
 
@@ -93,6 +94,9 @@
 
 <script>
 import MapaEcuador from "./MapaEcuador";
+import provinciasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Provincias.json";
+import cantonesData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Cantones.json";
+import parroquiasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Parroquias.json";
 
 export default {
   name: "MapaNacional",
@@ -112,6 +116,11 @@ export default {
   },
   data() {
     return {
+      datosExportacion: [
+        ...provinciasData,
+        ...cantonesData,
+        ...parroquiasData
+      ],
       select: "",
       select2: "",
       type: "1",

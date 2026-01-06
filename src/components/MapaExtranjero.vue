@@ -1,39 +1,6 @@
 <template>
   <v-sheet class="position-relative overflow-hidden">
-    <v-navigation-drawer v-model="drawer" absolute temporary width="300" color="#12a2c2" dark>
-      <v-container class="contenedor-filtros">
-        <h3 class="mb-4 text-uppercase" style="font-family: 'Oswald', sans-serif;">
-          Filtros Internacionales
-        </h3>
 
-        <div class="texto-filtro">VUELTA*</div>
-        <v-select v-model="filtroVuelta" :items="itemsVuelta" outlined dense background-color="rgba(255,255,255,0.1)"
-          hide-details dark class="mb-4"></v-select>
-
-        <div class="texto-filtro">PARTIDO POLITICO*</div>
-        <v-select v-model="filtroPartido" :items="itemsPartido" outlined dense background-color="rgba(255,255,255,0.1)"
-          hide-details dark class="mb-4"></v-select>
-
-        <div class="texto-filtro">PAÍS</div>
-        <v-select v-model="filtroPais" :items="itemsPais" outlined dense background-color="rgba(255,255,255,0.1)"
-          hide-details dark class="mb-6" placeholder="Ej: España"></v-select>
-
-        <p class="caption white--text">*Campo Obligatorio</p>
-
-        <v-btn block color="white" light class="font-weight-bold" style="font-family: 'Oswald', sans-serif;"
-          @click="aplicarFiltros">
-          BUSCAR
-        </v-btn>
-      </v-container>
-    </v-navigation-drawer>
-
-    <v-btn color="#12a2c2" dark fab small absolute top left style="top: 20px; left: 20px; z-index: 5;"
-      @click="drawer = !drawer">
-      <svg style="width:24px;height:24px" viewBox="0 0 24 24">
-        <path fill="currentColor"
-          d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" />
-      </svg>
-    </v-btn>
 
 
     <v-container fluid class="fondo-general">
@@ -68,7 +35,7 @@
 
           <v-row>
             <v-col cols="12" md="9">
-              <MapaMundi :datos="datosParaMapa" :configuracion="configuracionMapa" />
+              <MapaMundi :datos="datosParaMapa" :configuracion="configuracionMapa" :datosDescarga="datosExportacion" />
             </v-col>
             <v-col cols="12" md="3">
               <v-card class="pa-4 text-center">
@@ -84,6 +51,9 @@
 
 <script>
 import MapaMundi from "./MapaMundi.vue";
+import provinciasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Provincias.json";
+import cantonesData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Cantones.json";
+import parroquiasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Parroquias.json";
 
 const NAME_TO_ISO = {
   "ESPAÑA": "ES",
@@ -129,11 +99,7 @@ export default {
 
   data() {
     return {
-      drawer: false,
-      filtroVuelta: 'Primera Vuelta',
-      filtroPartido: '',
-      filtroPais: '',
-      itemsVuelta: ['Primera Vuelta', 'Segunda Vuelta'],
+
       vueltaSeleccionada: 1,
       configuracionMapa: {
         colorDefecto: "#CCC6C6",
@@ -144,21 +110,23 @@ export default {
   },
 
   computed: {
+    datosExportacion() {
+      const cantonesFiltrados = cantonesData.filter(c => c.CANTON && NAME_TO_ISO[c.CANTON.toUpperCase()]);
+      
+      const idsCantones = new Set(cantonesFiltrados.map(c => c.CODCAN));
+      const parroquiasFiltradas = parroquiasData.filter(p => idsCantones.has(p.CODCAN));
+
+      return [
+        ...provinciasData,
+        ...cantonesFiltrados,
+        ...parroquiasFiltradas
+      ];
+    },
+
     esPrimeraVuelta() {
       return this.vueltaSeleccionada === 1;
     },
-    itemsPais() {
-      if (!this.resultadosCantones || this.resultadosCantones.length === 0) return [];
 
-      const paises = this.resultadosCantones
-        .filter(c => c.CANTON && NAME_TO_ISO[c.CANTON.toUpperCase()])
-        .map(c => c.CANTON);
-      return [...new Set(paises)].sort();
-    },
-    itemsPartido() {
-      if (!this.colores) return [];
-      return Object.keys(this.colores).sort();
-    },
     datosParaMapa() {
       if (!this.resultadosCantones || this.resultadosCantones.length === 0) return [];
 
@@ -166,10 +134,6 @@ export default {
 
       this.resultadosCantones.forEach(cantonData => {
         const nombreCanton = cantonData.CANTON ? cantonData.CANTON.toUpperCase() : "";
-
-        if (this.filtroPais && this.filtroPais.toUpperCase() !== nombreCanton) {
-           return;
-        }
 
         const isoCode = NAME_TO_ISO[nombreCanton];
 
@@ -181,29 +145,16 @@ export default {
            let fill = "#cccccc";
            let tooltipText = "";
 
-           if (this.filtroPartido && cantonData.resultados && cantonData.resultados[this.filtroPartido]) {
-              const partyData = cantonData.resultados[this.filtroPartido];
-              winnerName = this.filtroPartido;
-              winnerVotes = partyData.votos;
-              winnerPercent = partyData.porcentaje;
-              
-              const baseColor = this.colores[this.filtroPartido] ? (this.colores[this.filtroPartido].principal || this.colores[this.filtroPartido]) : "#666666";
-              fill = baseColor;
-              
-              tooltipText = `[bold]${nombreCanton}[/]\n${winnerName}: ${winnerVotes.toLocaleString()} (${winnerPercent}%)`;
-
-           } else {
-               if (cantonData.resultados && cantonData.resultados[winnerName]) {
-                 winnerVotes = cantonData.resultados[winnerName].votos;
-                 winnerPercent = cantonData.resultados[winnerName].porcentaje; 
-               }
-
-               if (this.colores[winnerName]) {
-                 fill = this.colores[winnerName].principal || this.colores[winnerName]; 
-               }
-               
-               tooltipText = `[bold]${nombreCanton}[/]\nGanador: ${winnerName}\nVotos: ${winnerVotes.toLocaleString()} (${winnerPercent}%)`;
+           if (cantonData.resultados && cantonData.resultados[winnerName]) {
+             winnerVotes = cantonData.resultados[winnerName].votos;
+             winnerPercent = cantonData.resultados[winnerName].porcentaje; 
            }
+
+           if (this.colores[winnerName]) {
+             fill = this.colores[winnerName].principal || this.colores[winnerName]; 
+           }
+           
+           tooltipText = `[bold]${nombreCanton}[/]\nGanador: ${winnerName}\nVotos: ${winnerVotes.toLocaleString()} (${winnerPercent}%)`;
 
            datosMapeados.push({
              id: isoCode,
@@ -225,14 +176,7 @@ export default {
     setVuelta(numero) {
       this.vueltaSeleccionada = numero;
     },
-    aplicarFiltros() {
-      console.log("Filtros:", {
-        vuelta: this.filtroVuelta,
-        partido: this.filtroPartido,
-        pais: this.filtroPais
-      });
-      this.drawer = false;
-    }
+
   },
 };
 </script>
