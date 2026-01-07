@@ -1,12 +1,20 @@
 <template>
   <div>
-    <MapaExtranjero :resultadosCantones="resultadosCantones" :colores="coloresMap" />
+    <MapaExtranjero 
+      :resultadosCantones="resultadosCantones" 
+      :cantonesData="cantonesData"
+      :parroquiasData="parroquiasData"
+      :colores="coloresMap" 
+      tituloMap="Resultados Internacionales 1996"
+    />
   </div>
 </template>
 
 <script>
 import MapaExtranjero from "@/components/MapaExtranjero.vue";
 import resultadosCantones from "@/assets/1996/datos/presidentes/PrimeraVuelta/Datos2025Cantones.json";
+import cantonesData from "@/assets/1996/datos/presidentes/PrimeraVuelta/Datos2025Cantones.json";
+import parroquiasData from "@/assets/1996/datos/presidentes/PrimeraVuelta/Datos2025Parroquias.json";
 import { COLORES_PARTIDOS } from "@/assets/Informacion/ColoresPartidos";
 
 export default {
@@ -32,6 +40,8 @@ export default {
 
     return {
       resultadosCantones,
+      cantonesData,
+      parroquiasData,
       coloresMap,
     };
   },

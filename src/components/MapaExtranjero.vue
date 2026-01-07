@@ -13,7 +13,7 @@
                 <div class="contenedor-titulo">
                   <v-card elevation="24" color="#2c3e50">
                     <div class="tarjeta-titulo-mapa">
-                      Resultados Internacionales 1996
+                      {{ tituloMap }}
                     </div>
                   </v-card>
                 </div>
@@ -51,9 +51,6 @@
 
 <script>
 import MapaMundi from "./MapaMundi.vue";
-import provinciasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Provincias.json";
-import cantonesData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Cantones.json";
-import parroquiasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Parroquias.json";
 
 const NAME_TO_ISO = {
   "ESPAÑA": "ES",
@@ -94,7 +91,10 @@ export default {
 
   props: {
     resultadosCantones: { type: Array, default: () => [] },
+    cantonesData: { type: Array, default: () => [] },
+    parroquiasData: { type: Array, default: () => [] },
     colores: { type: Object, default: () => ({}) },
+    tituloMap: { type: String, default: "Resultados Internacionales" },
   },
 
   data() {
@@ -111,13 +111,13 @@ export default {
 
   computed: {
     datosExportacion() {
-      const cantonesFiltrados = cantonesData.filter(c => c.CANTON && NAME_TO_ISO[c.CANTON.toUpperCase()]);
+      const cantonesFiltrados = this.cantonesData.filter(c => c.CANTON && NAME_TO_ISO[c.CANTON.toUpperCase()]);
       
       const idsCantones = new Set(cantonesFiltrados.map(c => c.CODCAN));
-      const parroquiasFiltradas = parroquiasData.filter(p => idsCantones.has(p.CODCAN));
+      const parroquiasFiltradas = this.parroquiasData.filter(p => idsCantones.has(p.CODCAN));
 
       return [
-        ...provinciasData,
+
         ...cantonesFiltrados,
         ...parroquiasFiltradas
       ];

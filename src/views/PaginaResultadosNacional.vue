@@ -7,7 +7,9 @@
             :resultadosProvincias="resultadosProvincias" 
             :resultadosCantones="resultadosCantones" 
             :resultadosParroquias="resultadosParroquias"
+            :datosExportacion="datosExportacion"
             :colores="coloresMap"
+            tituloInicial="Resultados Nacionales 1996"
         />
     </div>
 </template>
@@ -15,8 +17,6 @@
 <script>
 import MapaNacional from "@/components/MapaNacional.vue";
 import geoProvincias from "@/assets/1996/MapaNacional/provincias.json";
-import geoCantones from "@/assets/1996/MapaNacional/cantones.json";
-import geoParroquias from "@/assets/1996/MapaNacional/parroquias.json";
 
 import resultadosProvincias from "@/assets/1996/datos/presidentes/PrimeraVuelta/Datos2025Provincias.json";
 import resultadosCantones from "@/assets/1996/datos/presidentes/PrimeraVuelta/Datos2025Cantones.json";
@@ -45,6 +45,23 @@ export default {
             "PAIS": COLORES_PARTIDOS["PAIS"],
         };
 
+        let geoCantones = {};
+        let geoParroquias = {};
+        
+        try {
+            const mapContext = require.context("@/assets/1996/MapaNacional/", false, /\.json$/);
+            
+            if (mapContext.keys().includes("./cantones.json")) {
+                geoCantones = mapContext("./cantones.json");
+            }
+            
+            if (mapContext.keys().includes("./parroquias.json")) {
+                geoParroquias = mapContext("./parroquias.json");
+            }
+        } catch (e) {
+            console.warn("Could not load optional map files dynamically:", e);
+        }
+
         return {
             geoProvincias, 
             geoCantones, 
@@ -55,5 +72,14 @@ export default {
             coloresMap
         };
     },
+    computed: {
+        datosExportacion() {
+            return [
+                ...this.resultadosProvincias,
+                ...this.resultadosCantones,
+                ...this.resultadosParroquias
+            ];
+        }
+    }
 };
 </script>

@@ -41,6 +41,8 @@
       <v-icon>search</v-icon>
     </v-btn>
 
+
+
     <v-container fluid class="fondo-general">
       <v-row no-gutters>
         <v-card outlined color="transparent" width="100%">
@@ -80,7 +82,11 @@
                 @mapaTitulo="(i) => (tituloMapa = i)" />
             </v-col>
 
-            <v-col cols="12" md="3">
+            <v-col cols="12" md="3" style="position: relative;">
+               <v-btn icon color="#12a2c2" style="position: absolute; top: -20px; right: 45px; z-index: 5"
+                  @click="limpiar">
+                  <v-icon color="white" size="24">mdi-delete</v-icon>
+               </v-btn>
               <v-card class="pa-4 text-center">
                 <h3>Tarjetas Pendientes</h3>
               </v-card>
@@ -94,33 +100,28 @@
 
 <script>
 import MapaEcuador from "./MapaEcuador";
-import provinciasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Provincias.json";
-import cantonesData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Cantones.json";
-import parroquiasData from "@/assets/1996/Datos/Presidentes/PrimeraVuelta/Datos2025Parroquias.json";
 
 export default {
   name: "MapaNacional",
   components: { MapaEcuador },
   props: {
     geoProvincias: { type: Object, required: true },
-    geoCantones: { type: Object, required: true },
-    geoParroquias: { type: Object, required: true },
+    geoCantones: { type: Object, required: false, default: () => ({}) },
+    geoParroquias: { type: Object, required: false, default: () => ({}) },
 
     resultadosProvincias: { type: Array, default: () => [] },
     resultadosCantones: { type: Array, default: () => [] },
     resultadosParroquias: { type: Array, default: () => [] },
     colores: { type: Object, default: () => ({}) },
+    datosExportacion: { type: Array, default: () => [] },
+
+    tituloInicial: { type: String, default: "Resultados Nacionales" },
 
     expand_b: String,
     expand2_b: String,
   },
   data() {
     return {
-      datosExportacion: [
-        ...provinciasData,
-        ...cantonesData,
-        ...parroquiasData
-      ],
       select: "",
       select2: "",
       type: "1",
@@ -133,7 +134,7 @@ export default {
 
       expand: true,
       tituloMapa: "0",
-      titulo: "Resultados Nacionales 2025",
+      titulo: this.tituloInicial,
     };
   },
 
@@ -189,7 +190,7 @@ export default {
       this.expand = true;
       this.$emit("add", 0);
       this.numvuelta = "1";
-      this.titulo = "Resultados Nacionales 2025";
+      this.titulo = this.tituloInicial;
       this.id_codMapa = ["1raVuelta", "", "", ""];
     },
     segundaV() {
@@ -197,7 +198,7 @@ export default {
       this.asignarTitulo2();
       this.$emit("add", 1);
       this.numvuelta = "2";
-      this.titulo = "Resultados Nacionales 2025";
+      this.titulo = this.tituloInicial;
       this.id_codMapa = ["2daVuelta", "", "", ""];
     },
 
@@ -241,7 +242,7 @@ export default {
       } else if (this.select) {
         this.titulo = "RESULTADOS " + this.select;
       } else {
-        this.titulo = "Resultados Nacionales 2025";
+        this.titulo = this.tituloInicial;
       }
     },
     asignarTitulo2() { },

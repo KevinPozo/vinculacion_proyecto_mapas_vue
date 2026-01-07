@@ -1,5 +1,81 @@
 <template>
-  <div class="mapa" ref="mapa"></div>
+  <div class="map-container" style="position: relative; width: 100%; height: 500px;">
+    <div class="mapa" ref="mapa" style="width: 100%; height: 100%;"></div>
+
+    <div style="position: absolute; top: 0px; right: 0px; z-index: 1000; padding: 10px;">
+      <v-menu offset-y :close-on-content-click="false">
+        <template v-slot:activator="{ props }">
+          <v-btn
+            color="#d9d9d9"
+            size="x-small"
+            class="rounded-sm"
+            elevation="1"
+            v-bind="props"
+            style="min-width: 30px; width: 30px; height: 30px; padding: 0;"
+          >
+             <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23546E7A' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/%3E%3C/svg%3E" alt="Exportar" style="width: 20px; height: 20px;" />
+          </v-btn>
+        </template>
+        <v-list density="compact">
+          
+          <v-menu location="start" open-on-hover :close-on-content-click="true">
+            <template v-slot:activator="{ props }">
+              <v-list-item v-bind="props">
+                <v-list-item-title>Imagen</v-list-item-title>
+                <template v-slot:append>
+                  <v-icon icon="mdi-chevron-right" size="small"></v-icon>
+                </template>
+              </v-list-item>
+            </template>
+            <v-list density="compact">
+              <v-list-item @click="exportImage('png')" value="png">
+                <v-list-item-title>PNG</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="exportImage('jpg')" value="jpg">
+                <v-list-item-title>JPG</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="exportImage('svg')" value="svg">
+                <v-list-item-title>SVG</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="exportImage('pdf')" value="pdf">
+                <v-list-item-title>PDF</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+
+          <v-menu location="start" open-on-hover :close-on-content-click="true">
+             <template v-slot:activator="{ props }">
+              <v-list-item v-bind="props">
+                <v-list-item-title>Datos</v-list-item-title>
+                <template v-slot:append>
+                  <v-icon icon="mdi-chevron-right" size="small"></v-icon>
+                </template>
+              </v-list-item>
+            </template>
+            <v-list density="compact">
+               <v-list-item @click="descargarJSON" value="json">
+                <v-list-item-title>JSON</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="descargarXLSX" value="xlsx">
+                 <v-list-item-title>XLSX</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="descargarHTML" value="html">
+                 <v-list-item-title>HTML</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="descargarPDF" value="pdf">
+                 <v-list-item-title>PDF</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+
+          <v-list-item @click="printMap" value="print">
+            <v-list-item-title>Imprimir</v-list-item-title>
+          </v-list-item>
+
+        </v-list>
+      </v-menu>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -8,6 +84,8 @@ import * as am4maps from "@amcharts/amcharts4/maps";
 import am4themes_animated from "@amcharts/amcharts4/themes/animated";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 am4core.useTheme(am4themes_animated);
 
@@ -16,8 +94,8 @@ export default {
 
   props: {
     geoProvincias: { type: Object, required: true },
-    geoCantones: { type: Object, required: true },
-    geoParroquias: { type: Object, required: true },
+    geoCantones: { type: Object, required: false, default: () => ({}) },
+    geoParroquias: { type: Object, required: false, default: () => ({}) },
 
     resultadosProvincias: { type: Array, default: () => [] },
     resultadosCantones: { type: Array, default: () => [] },
@@ -35,6 +113,7 @@ export default {
   data() {
     return {
       currentLevel: "PAIS",
+      datosExportacionProcesados: []
     };
   },
   created() {
@@ -158,46 +237,16 @@ export default {
 
     initMap() {
       this.fixGeoJsonIds(this.geoProvincias);
-      this.fixGeoJsonIds(this.geoCantones);
-      this.fixGeoJsonIds(this.geoParroquias);
+      this.fixGeoJsonIds(this.geoProvincias);
+      if (this.geoCantones && this.geoCantones.features) this.fixGeoJsonIds(this.geoCantones);
+      if (this.geoParroquias && this.geoParroquias.features) this.fixGeoJsonIds(this.geoParroquias);
 
       let chart = am4core.create(this.$refs.mapa, am4maps.MapChart);
       chart.projection = new am4maps.projections.Miller();
       chart.zoomControl = new am4maps.ZoomControl();
 
-      chart.exporting.menu = new am4core.ExportMenu();
-      const self = this;
-      chart.exporting.menu.items = [{
-          label: "",
-          icon: "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23546E7A' width='24px' height='24px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/%3E%3C/svg%3E",
-          menu: [
-            {
-              label: "Imagen",
-              menu: [
-                { type: "png", label: "PNG" },
-                { type: "jpg", label: "JPG" },
-                { type: "svg", label: "SVG" },
-                { type: "pdf", label: "PDF" }
-              ]
-            },
-            {
-              label: "Datos",
-              menu: [
-                { label: "JSON", type: "custom", click: function() { self.descargarJSON(); } },
-                { label: "XLSX", type: "custom", click: function() { self.descargarXLSX(); } },
-                { label: "HTML", type: "custom", click: function() { self.descargarHTML(); } }
-              ]
-            },
-            {
-              label: "Imprimir",
-              type: "print",
-              label: "Imprimir"
-            }
-          ]
-        }];
-        chart.exporting.filePrefix = "mapa_ecuador_export";
         
-        this.actualizarDatosExportacion(this.datosDescarga);
+      this.actualizarDatosExportacion(this.datosDescarga);
 
       let pais = chart.series.push(new am4maps.MapPolygonSeries());
       pais.geodata = this.geoProvincias;
@@ -375,6 +424,11 @@ Votos: {winnerVotes} ({winnerPercent}%)`;
     drillDownToProvince(dataContext) {
       try {
         let id = dataContext.id || dataContext.CODPRO;
+        
+        if (!this.geoCantones || !this.geoCantones.features || this.geoCantones.features.length === 0) {
+            console.warn("No geoCantones data available for drilldown.");
+            return;
+        }
 
         let features = this.geoCantones.features || [];
         let provinceCantones = features.filter((f) => {
@@ -405,6 +459,11 @@ Votos: {winnerVotes} ({winnerPercent}%)`;
     drillDownToCanton(dataContext) {
       try {
         let idCanton = dataContext.id || dataContext.CODCAN;
+
+        if (!this.geoParroquias || !this.geoParroquias.features || this.geoParroquias.features.length === 0) {
+             console.warn("No geoParroquias data available for drilldown.");
+             return;
+        }
 
         let features = this.geoParroquias.features || [];
         let cantonParroquias = features.filter((f) => {
@@ -452,96 +511,219 @@ Votos: {winnerVotes} ({winnerPercent}%)`;
     flattenElectionData(data) {
       if (!data || !Array.isArray(data)) return [];
       
+      const partidoFilter = this.id_1 && this.id_1.length > 1 ? this.id_1[1] : "";
+
       return data.map(item => {
-        let locationName = item.PROVINCIA || item.CANTON || item.PARROQUIA || "Desconocido";
+        let locationName = item.name || item.PARROQUIA || item.CANTON || item.PROVINCIA || "Desconocido";
         
+        let totalVotes = item.votos_total || item.votos_validos || 0;
+        
+        if (!totalVotes && item.resultados) {
+           if (item.resultados.VOTOS && item.resultados.VOTOS.votos) {
+               totalVotes = item.resultados.VOTOS.votos;
+           } else {
+               totalVotes = Object.values(item.resultados).reduce((sum, current) => {
+                   if (current && typeof current.votos === 'number' && current.candidato !== "VALIDOS") {
+                       return sum + current.votos;
+                   }
+                   return sum;
+               }, 0);
+           }
+        }
+
         const flatItem = {
           "Ubicación": locationName,
-          "Total de Votos": item.votos_validos || 0
+          "Total de Votos": totalVotes
         };
 
         if (item.resultados) {
-          const sortedCandidates = Object.values(item.resultados).sort((a, b) => b.votos - a.votos);
-          
-          if (sortedCandidates[0]) {
-            flatItem["Candidato 1"] = sortedCandidates[0].candidato;
-            flatItem["Votos Candidato 1"] = sortedCandidates[0].votos;
+          if (partidoFilter && item.resultados[partidoFilter]) {
+              const pData = item.resultados[partidoFilter];
+              flatItem["Partido"] = partidoFilter;
+              flatItem["Candidato"] = pData.candidato;
+              flatItem["Votos"] = pData.votos;
+              flatItem["Porcentaje"] = pData.porcentaje + "%";
           } else {
-             flatItem["Candidato 1"] = "";
-             flatItem["Votos Candidato 1"] = 0;
-          }
+              const validCandidates = Object.values(item.resultados).filter(c => c.candidato !== "VALIDOS");
+              const sortedCandidates = validCandidates.sort((a, b) => b.votos - a.votos);
+              
+              if (sortedCandidates[0]) {
+                flatItem["Candidato 1"] = sortedCandidates[0].candidato;
+                flatItem["Votos Candidato 1"] = sortedCandidates[0].votos;
+              } else {
+                 flatItem["Candidato 1"] = "";
+                 flatItem["Votos Candidato 1"] = 0;
+              }
 
-          if (sortedCandidates[1]) {
-            flatItem["Candidato 2"] = sortedCandidates[1].candidato;
-            flatItem["Votos Candidato 2"] = sortedCandidates[1].votos;
-          } else {
-             flatItem["Candidato 2"] = "";
-             flatItem["Votos Candidato 2"] = 0;
+              if (sortedCandidates[1]) {
+                flatItem["Candidato 2"] = sortedCandidates[1].candidato;
+                flatItem["Votos Candidato 2"] = sortedCandidates[1].votos;
+              } else {
+                 flatItem["Candidato 2"] = "";
+                 flatItem["Votos Candidato 2"] = 0;
+              }
           }
         } else {
-           flatItem["Candidato 1"] = "";
-           flatItem["Votos Candidato 1"] = 0;
-           flatItem["Candidato 2"] = "";
-           flatItem["Votos Candidato 2"] = 0;
+           if (partidoFilter) {
+              flatItem["Partido"] = partidoFilter;
+              flatItem["Candidato"] = "";
+              flatItem["Votos"] = 0;
+              flatItem["Porcentaje"] = "0%";
+           } else {
+              flatItem["Candidato 1"] = "";
+              flatItem["Votos Candidato 1"] = 0;
+              flatItem["Candidato 2"] = "";
+              flatItem["Votos Candidato 2"] = 0;
+           }
         }
         return flatItem;
       });
     },
 
     getDatosParaDescarga() {
-      return this.datosExportacionProcesados || this.datosDescarga || [];
+      let sourceData = [];
+
+      if (this.currentLevel === "PAIS" && this.paisSeries) {
+        sourceData = this.paisSeries.data;
+      } else if (this.currentLevel === "PROVINCIA" && this.provinciaSeries) {
+        sourceData = this.provinciaSeries.data;
+      } else if (this.currentLevel === "CANTON" && this.cantonSeries) {
+        sourceData = this.cantonSeries.data;
+      }
+
+      if (!sourceData || sourceData.length === 0) {
+          console.warn("No active series data found for level " + this.currentLevel + ". Using fallback.");
+          return this.datosExportacionProcesados || this.flattenElectionData(this.datosDescarga) || [];
+      }
+      
+      return this.flattenElectionData(sourceData);
     },
 
     descargarJSON() {
-      let datos = this.getDatosParaDescarga();
-      if (!datos || datos.length === 0) {
-        datos = this.flattenElectionData(this.datosDescarga);
+      try {
+        let datos = this.getDatosParaDescarga();
+        console.log("Datos para descarga:", datos);
+
+        if (!datos || datos.length === 0) {
+          datos = this.flattenElectionData(this.datosDescarga);
+           if (!datos || datos.length === 0) {
+             alert("No hay datos para exportar.");
+             return;
+           }
+        }
+        const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json;charset=utf-8" });
+        saveAs(blob, "Ecuador_Resultados.json");
+      } catch (e) {
+        console.error("Error en descargarJSON: ", e);
+        alert("Error al descargar JSON");
       }
-      const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json;charset=utf-8" });
-      saveAs(blob, "Ecuador_Resultados.json");
     },
 
     descargarXLSX() {
-      let datos = this.getDatosParaDescarga();
-      if (!datos || datos.length === 0) {
-        datos = this.flattenElectionData(this.datosDescarga);
-      }
-      if (!datos || datos.length === 0) return;
+      try {
+        let datos = this.getDatosParaDescarga();
+        if (!datos || datos.length === 0) {
+           datos = this.flattenElectionData(this.datosDescarga);
+           if (!datos || datos.length === 0) {
+             alert("No hay datos para exportar.");
+             return;
+           }
+        }
 
-      const ws = XLSX.utils.json_to_sheet(datos);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Provincias");
-      
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Ecuador_Resultados.xlsx");
+        const ws = XLSX.utils.json_to_sheet(datos);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Resultados");
+        
+        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        saveAs(new Blob([wbout], { type: "application/octet-stream" }), "Ecuador_Resultados.xlsx");
+      } catch (e) {
+         console.error("Error en descargarXLSX: ", e);
+         alert("Error al descargar XLSX");
+      }
     },
 
     descargarHTML() {
-       let datos = this.getDatosParaDescarga();
-       if (!datos || datos.length === 0) {
-        datos = this.flattenElectionData(this.datosDescarga);
+       try {
+         let datos = this.getDatosParaDescarga();
+         if (!datos || datos.length === 0) {
+            datos = this.flattenElectionData(this.datosDescarga);
+            if (!datos || datos.length === 0) {
+              alert("No hay datos para exportar.");
+              return;
+            }
+         }
+
+         let html = "<html><head><style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; font-family: Arial; } th { background-color: #f2f2f2; }</style></head><body><h2>Resultados Electorales</h2><table>";
+         
+         const keys = Object.keys(datos[0]);
+         html += "<thead><tr>";
+         keys.forEach(k => html += `<th>${k}</th>`);
+         html += "</tr></thead><tbody>";
+
+         datos.forEach(row => {
+           html += "<tr>";
+           keys.forEach(k => html += `<td>${row[k] !== undefined && row[k] !== null ? row[k] : ""}</td>`);
+           html += "</tr>";
+         });
+
+         html += "</tbody></table></body></html>";
+         
+         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+         saveAs(blob, "Ecuador_Resultados.html");
+       } catch (e) {
+          console.error("Error en descargarHTML: ", e);
+          alert("Error al descargar HTML");
        }
-       if (!datos || datos.length === 0) return;
+    },
 
-       let html = "<html><head><style>table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5px; font-family: Arial; } th { background-color: #f2f2f2; }</style></head><body><h2>Resultados Electorales</h2><table>";
-       
-       const keys = Object.keys(datos[0]);
-       html += "<thead><tr>";
-       keys.forEach(k => html += `<th>${k}</th>`);
-       html += "</tr></thead><tbody>";
+    descargarPDF() {
+      try {
+        let datos = this.getDatosParaDescarga();
+        if (!datos || datos.length === 0) {
+            datos = this.flattenElectionData(this.datosDescarga);
+            if (!datos || datos.length === 0) {
+              alert("No hay datos para exportar.");
+              return;
+            }
+        }
 
-       datos.forEach(row => {
-         html += "<tr>";
-         keys.forEach(k => html += `<td>${row[k] !== undefined && row[k] !== null ? row[k] : ""}</td>`);
-         html += "</tr>";
-       });
+        const doc = new jsPDF();
 
-       html += "</tbody></table></body></html>";
-       
-       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-       saveAs(blob, "Ecuador_Resultados.html");
+        doc.text("Resultados Electorales", 14, 15);
+
+        const tableColumn = Object.keys(datos[0]);
+        const tableRows = [];
+
+        datos.forEach(item => {
+          const rowData = tableColumn.map(col => item[col]);
+          tableRows.push(rowData);
+        });
+
+        autoTable(doc, {
+          head: [tableColumn],
+          body: tableRows,
+          startY: 20,
+        });
+        
+        doc.save("Ecuador_Resultados.pdf");
+
+      } catch (e) {
+         console.error("Error en descargarPDF: ", e);
+         alert("Error al descargar PDF: " + e.message);
+      }
+    },
+
+    exportImage(type) {
+      if (this.chart && this.chart.exporting) {
+        this.chart.exporting.export(type);
+      }
+    },
+
+    printMap() {
+       if (this.chart && this.chart.exporting) {
+         this.chart.exporting.export("print");
+       }
     }
-
 
   },
 };
